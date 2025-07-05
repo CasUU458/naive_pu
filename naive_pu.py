@@ -13,7 +13,7 @@ import time
 
 
 class LogisticRegression():
-    def __init__(self, learning_rate=0.01, num_iterations=1000,device='cpu',tolerance=1e-6):
+    def __init__(self, learning_rate=0.005, num_iterations=1000,device='cpu',tolerance=1e-6):
         
         self.learning_rate = learning_rate
         self.num_iterations = num_iterations
@@ -73,7 +73,6 @@ class LogisticRegression():
         for _ in range(self.num_iterations):
             linear_model = X_t @ self.weights + self.bias
             y_predicted = self._sigmoid(linear_model)
-            
             if _ % 100 == 0:
                 print(f"Iteration {_}, Loss: {self._loss(y_t, y_predicted).item()}")
 
@@ -271,14 +270,14 @@ X_train, y_train, X_test, y_test = data.get_X_y(test_size=0.2,
     c=1,labeling_mechanism="SCAR",
     train_balance=None,
     test_balance=None,
-    scale_data=None,
+    scale_data="standard",
     random_state=42)
 print("Data loaded in {:.2f} seconds".format(time.time() - t)   )
 print("Train set shape:", X_train.shape, y_train.shape)
 print("Test set shape:", X_test.shape, y_test.shape)
 print("First 5 rows of X_train:\n", X_train.head())  
 
-clf = LogisticRegression(learning_rate=0.01, num_iterations=1000)
+clf = LogisticRegression()
 clf.fit(X_train.values, y_train.values)
 y_pred = clf.predict(X_test.values)
 report = classification_report(y_test.values, y_pred, output_dict=True)
