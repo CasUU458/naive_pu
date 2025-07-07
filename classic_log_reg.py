@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 
-class ClassicLogReg():
+class ClassicLogReg:
     def __init__(self, learning_rate=0.001, num_iterations=1000,device='cpu',tolerance=1e-6):
         
         self.learning_rate = learning_rate
@@ -14,6 +14,7 @@ class ClassicLogReg():
         self.bias: torch.Tensor | None = None
         self.tolerance = tolerance
         self.loss_log = None
+
 
     @staticmethod
     def _sigmoid(z):
