@@ -1,16 +1,16 @@
 import torch
 import numpy as np
 
-from classifiers.helpers import _loss
+from classifiers.helpers import _loss,penalty
 from classifiers.base_log_reg import BaseLogReg
 from classifiers.helpers import c2b, _modified_pu_sigmoid, b2c
 from config import CONFIG
 
 
 class NaiveLogReg(BaseLogReg):
-    def __init__(self, learning_rate=0.001, epochs=1000, tolerance=1e-6, c_estimate=None, learning_rate_c=None):
+    def __init__(self, learning_rate=0.001, epochs=1000, tolerance=1e-6, c_estimate=None, learning_rate_c=None,penalty=None,solver="adam"):
 
-        super().__init__(learning_rate, epochs, tolerance, _modified_pu_sigmoid)
+        super().__init__(learning_rate, epochs, tolerance, _modified_pu_sigmoid,penalty,solver)
 
         self.optimizer_b = None
 
@@ -42,41 +42,84 @@ class NaiveLogReg(BaseLogReg):
         X_t = torch.as_tensor(X, dtype=torch.float32, device=CONFIG.TORCH_DEVICE)
         y_t = torch.as_tensor(y, dtype=torch.float32, device=CONFIG.TORCH_DEVICE)
 
-        self.optimizer = torch.optim.Adam([self.weights, self.bias], lr=self.learning_rate)
+        use_lbfgs = False
+        if str(self.optimizer).lower() == 'lbfgs':
+            if str(self.penalty).lower() == "l1":
+                raise ValueError("L1 penalty is not supported with LBFGS solver. Use Adam instead.")
+            else:
+                use_lbfgs = True
+
+        if use_lbfgs:
+            self.optimizer = torch.optim.LBFGS([self.weights, self.bias], lr=self.learning_rate)
+        else:
+            self.optimizer = torch.optim.Adam([self.weights, self.bias], lr=self.learning_rate)
 
         self.b = torch.tensor(self.b_init, device=CONFIG.TORCH_DEVICE, requires_grad=True)
-        self.optimizer_b = torch.optim.Adam([self.b], lr=self.learning_rate_c)
+        
+        if use_lbfgs:
+            self.optimizer_b = torch.optim.LBFGS([self.b], lr=self.learning_rate_c)
+        else:
+            self.optimizer_b = torch.optim.Adam([self.b], lr=self.learning_rate_c)
 
         prev_loss = float('inf')
         self.loss_log, self.loss_c_log, self.c_log = np.zeros(self.epochs), np.zeros(self.epochs), np.zeros(self.epochs)
 
         for _ in range(self.epochs):
-            linear_model = X_t @ self.weights + self.bias
-            y_predicted = self._activation(linear_model, self.b)
+            if use_lbfgs:
+                def closure():
+                    self.optimizer.zero_grad()
+                    linear_model = X_t @ self.weights + self.bias
+                    y_predicted = self._activation(linear_model, self.b)
+                    loss = _loss(y_t, y_predicted)
+                    loss = penalty(self.penalty, loss, self.weights)
+                    loss.backward()
+                    return loss
 
-            loss = _loss(y_t, y_predicted)
+                self.optimizer.step(closure)
+                loss = closure()
 
-            self.optimizer.zero_grad() # reset grads
-            loss.backward() # calculate grads
-            self.optimizer.step() # update weights and bias
+                def closure_b():
+                    self.optimizer_b.zero_grad()
+                    linear_model = X_t @ self.weights + self.bias
+                    y_predicted = self._activation(linear_model, self.b)
+                    loss = _loss(y_t, y_predicted)
+                    loss = penalty(self.penalty, loss, self.weights)
+                    loss.backward()
+                    return loss
 
+                self.optimizer_b.step(closure_b)
+                loss_b = closure_b()
+            else:
+            ####################################
+                linear_model = X_t @ self.weights + self.bias
+                y_predicted = self._activation(linear_model, self.b)
+
+                loss = _loss(y_t, y_predicted)
+
+                loss = penalty(self.penalty, loss, self.weights)
+
+                self.optimizer.zero_grad() # reset grads
+                loss.backward() # calculate grads
+                self.optimizer.step() # update weights and bias
+
+                
+                # NAIVE B OPTIMIZATION
+                linear_model = X_t @ self.weights + self.bias
+                y_predicted = self._activation(linear_model, self.b)
+
+                loss_b = _loss(y_t, y_predicted)
+                self.optimizer_b.zero_grad() # reset grads
+                loss_b.backward() # calculate grads
+                self.optimizer_b.step() # update b
+            
+            
             self.loss_log[_] = loss.item()
-
-            # NAIVE B OPTIMIZATION
-            linear_model = X_t @ self.weights + self.bias
-            y_predicted = self._activation(linear_model, self.b)
-
-            loss_b = _loss(y_t, y_predicted)
-            self.optimizer_b.zero_grad() # reset grads
-            loss_b.backward() # calculate grads
-            self.optimizer_b.step() # update b
-
             self.loss_c_log[_] = loss_b.item()
             self.c_log[_] = b2c(self.b.detach().numpy())
 
             if _ % 1000 == 0:
                 print(
-                    f"Iteration {_}, Loss: {_loss(y_t, y_predicted).item()} Loss b: {loss_b.item()}, c: {b2c(self.b.detach().cpu().numpy())}")
+                    f"Iteration {_}, Loss: {loss.item()} Loss b: {loss_b.item()}, c: {b2c(self.b.detach().cpu().numpy())}")
 
             if abs(prev_loss - loss.item()) < self.tolerance:
                 print(f"Converged after {_} iterations")

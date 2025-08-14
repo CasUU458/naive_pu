@@ -1,0 +1,101 @@
+2025-08-14 20:33:13 - INFO - SEED <property object at 0x10f0658f0>
+2025-08-14 20:33:13 - INFO - to_dict <function Config.to_dict at 0x10f075260>
+2025-08-14 20:33:13 - INFO - instance <config.Config object at 0x10b434d50>
+2025-08-14 20:33:13 - INFO - C 0.5
+2025-08-14 20:33:13 - INFO - RANDOM_SEED 42
+2025-08-14 20:33:13 - INFO - TORCH_DEVICE cpu
+2025-08-14 20:33:13 - INFO - DATASET_NAME BreastCancer
+2025-08-14 20:33:13 - INFO - TEST_SIZE 0.2
+2025-08-14 20:33:13 - INFO - LABELING_MECHANISM SCAR
+2025-08-14 20:33:13 - INFO - TRAIN_LABEL_DISTRIBUTION None
+2025-08-14 20:33:13 - INFO - TEST_LABEL_DISTRIBUTION None
+2025-08-14 20:33:13 - INFO - SCALE_DATA standard
+2025-08-14 20:33:13 - INFO - PENALTY None
+2025-08-14 20:33:13 - INFO - SOLVER adam
+2025-08-14 20:33:13 - INFO - EPOCHS 300
+2025-08-14 20:33:13 - INFO - TOLERANCE 1e-06
+2025-08-14 20:33:13 - INFO - INITIAL_GUESS_C 0.5
+2025-08-14 20:33:13 - INFO - true_prior_proba None
+2025-08-14 20:33:13 - INFO - train_prior_proba None
+2025-08-14 20:33:13 - INFO - test_prior_proba None
+2025-08-14 20:33:13 - INFO - true_train_labels None
+2025-08-14 20:33:13 - INFO - PU_test_labels None
+2025-08-14 20:39:11 - INFO - SEED <property object at 0x1303414e0>
+2025-08-14 20:39:11 - INFO - to_dict <function Config.to_dict at 0x13034d260>
+2025-08-14 20:39:11 - INFO - instance <config.Config object at 0x125ec4190>
+2025-08-14 20:39:11 - INFO - C 0.5
+2025-08-14 20:39:11 - INFO - RANDOM_SEED 42
+2025-08-14 20:39:11 - INFO - TORCH_DEVICE cpu
+2025-08-14 20:39:11 - INFO - DATASET_NAME BreastCancer
+2025-08-14 20:39:11 - INFO - TEST_SIZE 0.2
+2025-08-14 20:39:11 - INFO - LABELING_MECHANISM SCAR
+2025-08-14 20:39:11 - INFO - TRAIN_LABEL_DISTRIBUTION None
+2025-08-14 20:39:11 - INFO - TEST_LABEL_DISTRIBUTION None
+2025-08-14 20:39:11 - INFO - SCALE_DATA standard
+2025-08-14 20:39:11 - INFO - PENALTY None
+2025-08-14 20:39:11 - INFO - SOLVER adam
+2025-08-14 20:39:11 - INFO - EPOCHS 300
+2025-08-14 20:39:11 - INFO - TOLERANCE 1e-06
+2025-08-14 20:39:11 - INFO - INITIAL_GUESS_C 0.5
+2025-08-14 20:39:11 - INFO - true_prior_proba None
+2025-08-14 20:39:11 - INFO - train_prior_proba None
+2025-08-14 20:39:11 - INFO - test_prior_proba None
+2025-08-14 20:39:11 - INFO - true_train_labels None
+2025-08-14 20:39:11 - INFO - PU_test_labels None
+2025-08-14 20:40:36 - INFO - SEED <property object at 0x11e8ea2f0>
+2025-08-14 20:40:36 - INFO - to_dict <function Config.to_dict at 0x11e8f51c0>
+2025-08-14 20:40:36 - INFO - instance <config.Config object at 0x10dc28190>
+2025-08-14 20:40:36 - INFO - C 0.5
+2025-08-14 20:40:36 - INFO - RANDOM_SEED 42
+2025-08-14 20:40:36 - INFO - TORCH_DEVICE cpu
+2025-08-14 20:40:36 - INFO - DATASET_NAME BreastCancer
+2025-08-14 20:40:36 - INFO - TEST_SIZE 0.2
+2025-08-14 20:40:36 - INFO - LABELING_MECHANISM SCAR
+2025-08-14 20:40:36 - INFO - TRAIN_LABEL_DISTRIBUTION None
+2025-08-14 20:40:36 - INFO - TEST_LABEL_DISTRIBUTION None
+2025-08-14 20:40:36 - INFO - SCALE_DATA standard
+2025-08-14 20:40:36 - INFO - PENALTY None
+2025-08-14 20:40:36 - INFO - SOLVER adam
+2025-08-14 20:40:36 - INFO - EPOCHS 300
+2025-08-14 20:40:36 - INFO - TOLERANCE 1e-06
+2025-08-14 20:40:36 - INFO - INITIAL_GUESS_C 0.5
+2025-08-14 20:40:36 - INFO - true_prior_proba None
+2025-08-14 20:40:36 - INFO - train_prior_proba None
+2025-08-14 20:40:36 - INFO - test_prior_proba None
+2025-08-14 20:40:36 - INFO - true_train_labels None
+2025-08-14 20:40:36 - INFO - PU_test_labels None
+2025-08-14 20:40:36 - INFO - Current time: 1755196836.4812381
+2025-08-14 20:40:36 - INFO - Train set shape: (456, 30) (456,)
+2025-08-14 20:40:36 - INFO - Test set shape: (113, 30) (113,)
+2025-08-14 20:40:36 - INFO - Train n positive: 143
+2025-08-14 20:40:36 - INFO - Train n negative: 313
+2025-08-14 20:40:37 - INFO - Classic Logistic Regression - Classification Report:
+              precision    recall  f1-score     support
+0              0.732143  0.976190  0.836735   42.000000
+1              0.982456  0.788732  0.875000   71.000000
+accuracy       0.858407  0.858407  0.858407    0.858407
+macro avg      0.857299  0.882461  0.855867  113.000000
+weighted avg   0.889419  0.858407  0.860777  113.000000
+2025-08-14 20:40:37 - INFO - Classic Logistic Regression - Confusion Matrix:
+[[41  1]
+ [15 56]]
+2025-08-14 20:40:37 - INFO - Sklearn Logistic Regression - Classification Report:
+              precision    recall  f1-score     support
+0              0.518519  1.000000  0.682927   42.000000
+1              1.000000  0.450704  0.621359   71.000000
+accuracy       0.654867  0.654867  0.654867    0.654867
+macro avg      0.759259  0.725352  0.652143  113.000000
+weighted avg   0.821042  0.654867  0.644243  113.000000
+2025-08-14 20:40:37 - INFO - Sklearn Logistic Regression - Confusion Matrix:
+[[42  0]
+ [39 32]]
+2025-08-14 20:40:37 - INFO - Naive Logistic Regression - Classification Report:
+              precision    recall  f1-score     support
+0              0.973684  0.880952  0.925000   42.000000
+1              0.933333  0.985915  0.958904   71.000000
+accuracy       0.946903  0.946903  0.946903    0.946903
+macro avg      0.953509  0.933434  0.941952  113.000000
+weighted avg   0.948331  0.946903  0.946303  113.000000
+2025-08-14 20:40:37 - INFO - Naive Logistic Regression - Confusion Matrix:
+[[37  5]
+ [ 1 70]]

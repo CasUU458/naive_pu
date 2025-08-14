@@ -71,7 +71,7 @@ def prepare_and_split_data(data,
 
     match labeling_mechanism:
         case "SCAR":
-            # c = p(s = 1 |y = 1) - thus, the probability that a positive label is labeled
+            # c = p(s = 1 |y = 1) thus, the probability that a positive label is labeled
             # following c, a fraction of the positive labels are unlabeled here (set to 0)
             train = SCAR(train, c)
             test = SCAR(test, c)
@@ -130,16 +130,22 @@ def load_mnist(digits: str | None = None):
         df = pd.read_parquet('mnist_784.parquet', engine='pyarrow')
     df.rename(columns={'class': 'target'}, inplace=True)  # Rename the target column to 'target'
     df["target"] = df["target"].values.to_numpy()
+    df["target"] = pd.to_numeric(df["target"], errors='coerce').astype(int)  # Ensure target is numeric
+    
     if digits is not None:
-        d1 = df[df['target'] == digits[0]]
-        d2 = df[df['target'] == digits[1]]
+        d1 = digits[0]
+        d2 = digits[1]
     else:
-        d1 = df[df['target'] == '3']
-        d2 = df[df['target'] == '5']
+        d1 = 3
+        d2 = 5
+    
+    df1 = df[df['target'] == d1]
+    df2 = df[df['target'] == d2]
+
 
     # Concatenate the two digits and shuffle the DataFrame
-    df = pd.concat([d1, d2], axis=0).sample(frac=1, random_state=42).reset_index(drop=True)
+    df = pd.concat([df1, df2], axis=0).sample(frac=1, random_state=42).reset_index(drop=True)
     # Convert the target column to numeric values
-    df.loc[df["target"] == '3', "target"] = 0
-    df.loc[df["target"] == '5', "target"] = 1
+    df.loc[df["target"] == d1, "target"] = 0
+    df.loc[df["target"] == d2, "target"] = 1
     return df

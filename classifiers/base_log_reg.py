@@ -7,14 +7,15 @@ from classifiers.helpers import b2c
 
 
 class BaseLogReg(ABC):
-    def __init__(self, learning_rate, epochs, tolerance, activation):
+    def __init__(self, learning_rate, epochs, tolerance, activation, penalty,solver):
         self.learning_rate = learning_rate
         self.epochs = epochs
         self.tolerance = tolerance
 
         self._activation = activation
+        self.penalty = penalty
 
-        self.optimizer = None
+        self.optimizer = solver
         self.weights: torch.Tensor | None = None
         self.bias: torch.Tensor | None = None
 

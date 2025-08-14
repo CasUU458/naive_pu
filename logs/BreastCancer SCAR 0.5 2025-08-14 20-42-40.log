@@ -1,0 +1,57 @@
+2025-08-14 20:42:40 - INFO - SEED <property object at 0x1296a9df0>
+2025-08-14 20:42:40 - INFO - to_dict <function Config.to_dict at 0x1296b51c0>
+2025-08-14 20:42:40 - INFO - instance <config.Config object at 0x1296ae850>
+2025-08-14 20:42:40 - INFO - C 0.5
+2025-08-14 20:42:40 - INFO - RANDOM_SEED 42
+2025-08-14 20:42:40 - INFO - TORCH_DEVICE cpu
+2025-08-14 20:42:40 - INFO - DATASET_NAME BreastCancer
+2025-08-14 20:42:40 - INFO - TEST_SIZE 0.2
+2025-08-14 20:42:40 - INFO - LABELING_MECHANISM SCAR
+2025-08-14 20:42:40 - INFO - TRAIN_LABEL_DISTRIBUTION None
+2025-08-14 20:42:40 - INFO - TEST_LABEL_DISTRIBUTION None
+2025-08-14 20:42:40 - INFO - SCALE_DATA standard
+2025-08-14 20:42:40 - INFO - PENALTY None
+2025-08-14 20:42:40 - INFO - SOLVER adam
+2025-08-14 20:42:40 - INFO - EPOCHS 300
+2025-08-14 20:42:40 - INFO - TOLERANCE 1e-06
+2025-08-14 20:42:40 - INFO - INITIAL_GUESS_C 0.5
+2025-08-14 20:42:40 - INFO - true_prior_proba None
+2025-08-14 20:42:40 - INFO - train_prior_proba None
+2025-08-14 20:42:40 - INFO - test_prior_proba None
+2025-08-14 20:42:40 - INFO - true_train_labels None
+2025-08-14 20:42:40 - INFO - PU_test_labels None
+2025-08-14 20:42:40 - INFO - Current time: 1755196960.121739
+2025-08-14 20:42:40 - INFO - Train set shape: (456, 30) (456,)
+2025-08-14 20:42:40 - INFO - Test set shape: (113, 30) (113,)
+2025-08-14 20:42:40 - INFO - Train n positive: 143
+2025-08-14 20:42:40 - INFO - Train n negative: 313
+2025-08-14 20:42:40 - INFO - Classic Logistic Regression - Classification Report:
+              precision    recall  f1-score     support
+0              0.777778  1.000000  0.875000   42.000000
+1              1.000000  0.830986  0.907692   71.000000
+accuracy       0.893805  0.893805  0.893805    0.893805
+macro avg      0.888889  0.915493  0.891346  113.000000
+weighted avg   0.917404  0.893805  0.895541  113.000000
+2025-08-14 20:42:40 - INFO - Classic Logistic Regression - Confusion Matrix:
+[[42  0]
+ [12 59]]
+2025-08-14 20:42:40 - INFO - Sklearn Logistic Regression - Classification Report:
+              precision    recall  f1-score     support
+0              0.545455  1.000000  0.705882   42.000000
+1              1.000000  0.507042  0.672897   71.000000
+accuracy       0.690265  0.690265  0.690265    0.690265
+macro avg      0.772727  0.753521  0.689390  113.000000
+weighted avg   0.831054  0.690265  0.685157  113.000000
+2025-08-14 20:42:40 - INFO - Sklearn Logistic Regression - Confusion Matrix:
+[[42  0]
+ [35 36]]
+2025-08-14 20:42:41 - INFO - Naive Logistic Regression - Classification Report:
+              precision    recall  f1-score     support
+0              1.000000  0.952381  0.975610   42.000000
+1              0.972603  1.000000  0.986111   71.000000
+accuracy       0.982301  0.982301  0.982301    0.982301
+macro avg      0.986301  0.976190  0.980860  113.000000
+weighted avg   0.982786  0.982301  0.982208  113.000000
+2025-08-14 20:42:41 - INFO - Naive Logistic Regression - Confusion Matrix:
+[[40  2]
+ [ 0 71]]
