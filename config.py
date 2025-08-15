@@ -6,12 +6,12 @@ class Config:
         if not hasattr(cls, 'instance'):
             cls.instance = super(Config, cls).__new__(cls)
 
-            cls.c = 0.3
+            cls.c = 0.5
 
             cls.RANDOM_SEED = False
             cls.TORCH_DEVICE = 'cpu'
-            cls.DATASET_NAME = 'MNIST'
-            cls.TEST_SIZE = 0.2
+            cls.DATASET_NAME = 'MNIST' #MNIST, BreastCancer
+            cls.TEST_SIZE = 0.5
             cls.LABELING_MECHANISM = 'SCAR'
             cls.TRAIN_LABEL_DISTRIBUTION= None
             cls.TEST_LABEL_DISTRIBUTION = None
@@ -19,9 +19,10 @@ class Config:
         
 
             cls.EPOCHS= 500
-            cls.INITIAL_GUESS_C = 0.3
+            cls.INITIAL_GUESS_C = None
             cls.LEARNING_RATE = 0.001
             cls.LEARNING_RATE_C = 3* 1 / cls.EPOCHS
+            cls.penalty = "l1"
 
             # state variables
             cls.true_prior_proba = None

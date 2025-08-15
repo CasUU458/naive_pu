@@ -15,6 +15,46 @@ def _loss (y_true, y_pred):
     loss = -torch.mean(term1 + term2)
     return loss
 
+def penalty(type,loss,weights):
+    if str(type).lower() == "l1":
+        return loss + l1_penalty(weights)
+    elif str(type).lower() == "l2":
+        return loss + l2_penalty(weights)
+    return loss    
+
+def l1_penalty(weights, C=1):
+    
+    """
+    Compute the L1 regularization penalty for given model weights.
+    L1 penalty: mean of absolute weight values
+
+    Drives weights to zero!
+
+    Parameters:
+    weights: Model weight tensor (bias should be excluded).
+
+    C (float): Inverse regularization strength, Larger C => weaker regularization. Default = 1.
+    """
+    
+    lamda = 1 / C 
+    return lamda * torch.mean(torch.abs(weights))
+
+
+def l2_penalty(weights, C=1):
+    """
+    Compute the L2 regularization penalty for given model weights.
+    L2 penalty: mean of squared weight values
+    
+    Parameters:
+    weights: Model weight tensor (bias should be excluded).
+    C (float) : Inverse regularization strength, Larger C => weaker regularization. Default = 1.
+
+    """
+    lamda = 1 / C  
+    
+    return lamda * torch.mean(weights ** 2)
+
+
 def _sigmoid(z):
     return 1. / (1. + torch.exp(-z))
 

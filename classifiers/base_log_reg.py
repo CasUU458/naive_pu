@@ -7,11 +7,12 @@ from classifiers.helpers import b2c
 
 
 class BaseLogReg(ABC):
-    def __init__(self, learning_rate, epochs, tolerance, activation):
+    def __init__(self, learning_rate, epochs, tolerance, activation,penalty):
         self.learning_rate = learning_rate
         self.epochs = epochs
         self.tolerance = tolerance
-
+        self.penalty = penalty
+        
         self._activation = activation
 
         self.optimizer = None

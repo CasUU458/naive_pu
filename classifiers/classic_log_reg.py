@@ -1,15 +1,15 @@
 import torch 
 import numpy as np
 
-from classifiers.helpers import _loss, _sigmoid
+from classifiers.helpers import _loss, _sigmoid,penalty
 from classifiers.base_log_reg import BaseLogReg
 from config import CONFIG
 
 
 class ClassicLogReg(BaseLogReg):
-    def __init__(self, learning_rate=0.001, epochs=1000, tolerance=1e-6):
+    def __init__(self, learning_rate=0.001, epochs=1000, tolerance=1e-6,penalty=None):
 
-        super().__init__(learning_rate, epochs, tolerance, _sigmoid)
+        super().__init__(learning_rate, epochs, tolerance, _sigmoid,penalty)
 
 
     def fit(self, X, y):
@@ -34,6 +34,7 @@ class ClassicLogReg(BaseLogReg):
                 print(f"Iteration {_}, Loss: {_loss(y_t, y_predicted).item()}")
 
             loss = _loss(y_t, y_predicted)
+            loss = penalty(self.penalty, loss, self.weights)
 
             self.optimizer.zero_grad() # reset grads
             loss.backward() # calculate grads

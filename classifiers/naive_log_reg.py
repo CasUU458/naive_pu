@@ -1,16 +1,16 @@
 import torch
 import numpy as np
 
-from classifiers.helpers import _loss
+from classifiers.helpers import _loss,penalty
 from classifiers.base_log_reg import BaseLogReg
 from classifiers.helpers import c2b, _modified_pu_sigmoid, b2c
 from config import CONFIG
 
 
 class NaiveLogReg(BaseLogReg):
-    def __init__(self, learning_rate=0.001, epochs=1000, tolerance=1e-6, c_estimate=None, learning_rate_c=None):
+    def __init__(self, learning_rate=0.001, epochs=1000, tolerance=1e-6, c_estimate=None, learning_rate_c=None,penalty=None):
 
-        super().__init__(learning_rate, epochs, tolerance, _modified_pu_sigmoid)
+        super().__init__(learning_rate, epochs, tolerance, _modified_pu_sigmoid,penalty)
 
         self.optimizer_b = None
 
@@ -55,6 +55,7 @@ class NaiveLogReg(BaseLogReg):
             y_predicted = self._activation(linear_model, self.b)
 
             loss = _loss(y_t, y_predicted)
+            loss = penalty(self.penalty, loss, self.weights)
 
             self.optimizer.zero_grad() # reset grads
             loss.backward() # calculate grads

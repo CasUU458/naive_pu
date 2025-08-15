@@ -28,7 +28,7 @@ for C in CONFIG.to_dict().keys():
 
 
 
-data = get_pd_dataset(name='BreastCancer')
+data = get_pd_dataset(name=CONFIG.DATASET_NAME)
 X_train, y_train, X_test, y_test = prepare_and_split_data(data = data,
                                                           test_size=CONFIG.TEST_SIZE,
                                                           c=CONFIG.c,
