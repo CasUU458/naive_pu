@@ -7,12 +7,12 @@ from classifiers.helpers import b2c
 
 
 class BaseLogReg(ABC):
-    def __init__(self, learning_rate, epochs, tolerance, activation,penalty):
+    def __init__(self, learning_rate, epochs, tolerance, activation,penalty,solver):
         self.learning_rate = learning_rate
         self.epochs = epochs
         self.tolerance = tolerance
         self.penalty = penalty
-        
+        self.solver = solver
         self._activation = activation
 
         self.optimizer = None
@@ -26,7 +26,7 @@ class BaseLogReg(ABC):
     def fit(self, X, y):
         # require all subclasses to override this method.
         pass
-
+    
 
     @abstractmethod
     def predict(self, X, threshold=0.5):

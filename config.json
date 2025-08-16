@@ -1,0 +1,24 @@
+{
+  "c": 0.4,
+  "RANDOM_SEED": false,
+  "TORCH_DEVICE": "cpu",
+  "DATASET_NAME": "MNIST",
+  "TEST_SIZE": 0.2,
+  "LABELING_MECHANISM": "SCAR",
+  "TRAIN_LABEL_DISTRIBUTION": null,
+  "TEST_LABEL_DISTRIBUTION": null,
+  "SCALE_DATA": "standard",
+
+  "EPOCHS": 100,
+  "INITIAL_GUESS_C": null,
+  "LEARNING_RATE": 0.001,
+  "LEARNING_RATE_C_modifier": 1,
+  "penalty": "l1",
+  "solver": "adam",
+
+  "true_prior_proba": null,
+  "train_prior_proba": null,
+  "test_prior_proba": null,
+  "true_train_labels": null,
+  "PU_test_labels": null
+}
