@@ -1,7 +1,7 @@
 import torch 
 import numpy as np
 
-from classifiers.helpers import _loss, _sigmoid,penalty
+from classifiers.helpers import _sigmoid,penalty
 from classifiers.base_log_reg import BaseLogReg
 from classifiers.naive_log_reg import NaiveLogReg
 from classifiers.classic_log_reg import ClassicLogReg
@@ -14,9 +14,13 @@ class TwoModelLogReg(BaseLogReg):
 
         super().__init__(learning_rate, epochs, tolerance, _sigmoid,penalty,solver)
         self.naive_clf = NaiveLogReg(epochs=300,penalty="l2",solver="adam")
-        self.e = self.E()
-        self.y = self.Y()
+        self.e = None
+        self.y = None
+        self.s = None
+        self.OR = None
         self.iter = 0 #iteration counter
+        self.alpha = alpha #alpha is the quantile for the threshold 
+        self.epsilon = epsilon
 
     def fit(self,X,y):
         
@@ -28,18 +32,21 @@ class TwoModelLogReg(BaseLogReg):
         self.naive_clf.fit(X, y)
         self.e = self.E()
         self.y = self.Y()
+        self.s = self.S(self, self.e, self.y)
+        self.OR = self.OddsRatio(self.e, self.s)
 
-        iter = 0
-        while iter < self.epochs and converge_treshold > self.epsilon:
-            self.y.fit(X, y, sample_weight=OR)
+        while self.iter < self.epochs and converge_treshold > self.epsilon:
+            self.y.fit(X, y)
             threshold = self.calc_threshold(X,alpha=self.alpha)
             p = self.define_psuedo_set(X, threshold)
             self.e.fit(X, p)
-            OR = self.update_OR(X)
 
-            iter += 1
+            self.s.update(self.e, self.y)
+            self.OR.update(self.e, self.s)
+
+            self.iter += 1
             converge_treshold = 1
-           
+        
 
         elapsed = time.perf_counter() - start
         logging.info(f"ClassicLogReg completed in {elapsed:.4f} seconds")
@@ -63,27 +70,47 @@ class TwoModelLogReg(BaseLogReg):
     
 
 
-    def calc_threshold(self):
-        raise NotImplementedError("calc_threshold method not implemented")
+    def calc_threshold(self,x):
+        return self.quantile(x)
 
-    
+    def quantile(self, X):
+        probs = self.y.predict_proba(X)
+        return np.quantile(probs, self.alpha)
 
-    def S(self, X):
-        if self.out.iter > 0:
-            f = self.y.predict_proba(X)*self.e.predict_proba(X)
-            return f
-        else:
-            return self.s_naive(X)
+    class S():
+        def __init__(self, out, e, y):
+            self.out = out
+            self.e = e.copy()
+            self.y = y.copy()
+        
+        def __call__(self, X):
+            
+            if self.out.iter > 0:
+                f = self.y.predict_proba(X)*self.e.predict_proba(X)
+                return f
+            else:
+                return self.s_naive(X)
 
-    def s_naive(self,X):
-        return self.naive_clf.predict_label_proba(X)
+        def s_naive(self,X):
+            return self.out.naive_clf.predict_label_proba(X)
 
+        def update(self,e,y):
+            self.e = e.copy()
+            self.y = y.copy()
 
-    def OR(self,X):
-       e = self.e.predict_proba(X)
-       s = self.S(X)
-       return (e / (1 - e)) * ((1-s) / s)
+    class OddsRatio():
+        def __init__(self, e,s):
+            self.e = e.copy()
+            self.s = s.copy()
 
+        def __call__(self, X):
+            e = self.e.predict_proba(X)
+            s = self.s(X)
+            return (e / (1 - e)) * ((1-s) / s)
+
+        def update(self,e,s):
+            self.e = e.copy()
+            self.s = s.copy()
 
     class Y(ClassicLogReg):
         def __init__(self,out, learning_rate=0.001, epochs=1000, tolerance=0.000001, penalty=None, solver='adam'):
@@ -96,16 +123,14 @@ class TwoModelLogReg(BaseLogReg):
         def w1(self,s,X):
             return s+(1-s)*self.out.OR(X)
 
-        def _loss(self,X,s):
-                eps = 1e-15  # to avoid log(0), numerical stability, small constant
-                # ensure y_pred is in the range [eps, 1-eps]
-                #clamp_min y_pred to avoid log(0)
+        def _weighted_loss(self,s,y_pred,X):
+            eps = 1e-15  # to avoid log(0), numerical stability, small constant
+            # ensure y_pred is in the range [eps, 1-eps]
+            #clamp_min y_pred to avoid log(0)
 
-                #positive contribution
-                s = s.clamp(eps, 1. - eps)
-                term1 = self.w1(X,s)* torch.log(s)
-                term2 = self.w0 * torch.log(1. - s)
-                loss = -torch.mean(term1 + term2)        
+            s = s.clamp(eps, 1. - eps)
+            W = self.w1(s, X)* torch.log(y_pred) + self.w0(s, X)* torch.log(1. - y_pred)
+            return -torch.mean(W)      
         
 
         
@@ -129,9 +154,9 @@ class TwoModelLogReg(BaseLogReg):
                 linear_model = X_t @ self.weights + self.bias
                 y_predicted = self._activation(linear_model)
                 if _ % 100 == 0:
-                    print(f"Iteration {_}, Loss: {_loss(s_t, y_predicted).item()}")
+                    print(f"Iteration {_}, Loss: {self._weighted_loss(s_t, y_predicted,X).item()}")
 
-                loss = _loss(s_t, y_predicted)
+                loss = self._weighted_loss(s_t, y_predicted,X)
                 loss = penalty(self.penalty, loss, self.weights)
 
                 self.optimizer.zero_grad() # reset grads
@@ -143,7 +168,8 @@ class TwoModelLogReg(BaseLogReg):
                 if abs(prev_loss - loss.item()) < self.tolerance:
                     print(f"Converged after {_} iterations")
                     break  
-            
+                
+                prev_loss = loss.item()
             return self
 
     class E(ClassicLogReg):
@@ -155,5 +181,12 @@ class TwoModelLogReg(BaseLogReg):
             if self.out.iter > 0:
                 linear_model = self.update_linear_model(X)
                 return self._activation(linear_model).detach().numpy()
+            #Polynomial estimate of e, see paper 
+            return 1/2*(self.s_naive(X) + 1)
 
-            return 1/2*(self.out.s_naive(X) + 1)
+
+    def predict(self, X, threshold=0.5):
+        return self.y.predict(X, threshold)
+    
+    def predict_proba(self,X):
+        return self.y.predict_proba(X)
