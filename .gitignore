@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *.pyo
 
-# Logs
+# Logs and outputs
 logs/
 
 # Data files (large datasets)

@@ -200,3 +200,11 @@ class NaiveLogReg(BaseLogReg):
         if self.b is None:
             raise ValueError("Model has not been trained yet. Call fit() before get_b().")
         return b2c(self.b.detach().numpy())
+    """
+    s(x) = p(s=1|x)
+    s(x) = probaility that a instance is labeled
+    """
+    def predict_label_proba(self, X, threshold=0.5):
+        linear_model = self.update_linear_model(X)
+        return self._activation(linear_model, self.b).detach().numpy()
+        
