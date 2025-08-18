@@ -10,6 +10,7 @@ import time
 
 from classifiers.classic_log_reg import ClassicLogReg
 from classifiers.naive_log_reg import NaiveLogReg
+from classifiers.TM_log_reg import TwoModelLogReg
 from data.datasets import prepare_and_split_data, get_pd_dataset
 import logging
 import os
@@ -85,4 +86,21 @@ def experiment():
     plt.show()
 
 if __name__ == "__main__":
-    experiment()
+    # experiment()
+
+    data = get_pd_dataset(name=CONFIG.DATASET_NAME)
+
+    #preprocess and split the dataset into train an test data
+    X_train, y_train, X_test, y_test = prepare_and_split_data(data = data,
+                                                            test_size=CONFIG.TEST_SIZE,
+                                                            c=CONFIG.c,
+                                                            labeling_mechanism=CONFIG.LABELING_MECHANISM,
+                                                            train_label_distribution=CONFIG.TRAIN_LABEL_DISTRIBUTION,
+                                                            test_label_distribution=CONFIG.TEST_LABEL_DISTRIBUTION,
+                                                            scale_data=CONFIG.SCALE_DATA)
+
+    print(X_train.shape, y_train.shape)
+
+
+    clf = TwoModelLogReg()
+    clf = do_classification(clf, "Two Model Logistic Regression", X_train, y_train, X_test, y_test)
