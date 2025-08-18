@@ -6,6 +6,7 @@ from classifiers.base_log_reg import BaseLogReg
 from classifiers.naive_log_reg import NaiveLogReg
 from classifiers.classic_log_reg import ClassicLogReg
 from config import CONFIG
+import copy
 import time
 import logging
 
@@ -37,14 +38,16 @@ class TwoModelLogReg(BaseLogReg):
         self.s = self.S(self, self.e, self.y)
         self.OR = self.OddsRatio(self.e, self.s)
 
+        converge_treshold = 1
+
         while self.iter < self.epochs and converge_treshold > self.epsilon:
 
             self.y.fit(X, s)
 
 
             pred = self.y.predict_proba(X) 
-            threshold = self.calc_threshold(pred,alpha=self.alpha)
-            p = self.define_psuedo_set(X, threshold)
+            threshold = self.calc_threshold(pred)
+            p = self.define_psuedo_set(X,s, threshold)
 
 
             self.e.fit(X, p)
@@ -80,7 +83,7 @@ class TwoModelLogReg(BaseLogReg):
 
     def calc_threshold(self,pred):
         
-        pred = np.sort(pred,ascending=True)
+        pred = np.sort(pred)
         
 
         return self.quantile(pred)
@@ -100,9 +103,9 @@ class TwoModelLogReg(BaseLogReg):
 
         def __init__(self, out, e, y):
             self.out = out
-            self.e = e.copy()
-            self.y = y.copy()
-        
+            self.e = copy.deepcopy(e)
+            self.y = copy.deepcopy(y)
+
         def __call__(self, X):
             
             if self.out.iter > 0:
@@ -115,8 +118,8 @@ class TwoModelLogReg(BaseLogReg):
             return self.out.naive_clf.predict_label_proba(X)
 
         def update(self,e,y):
-            self.e = e.copy()
-            self.y = y.copy()
+            self.e = copy.deepcopy(e)
+            self.y = copy.deepcopy(y)
 
     class OddsRatio():
         """
@@ -126,8 +129,8 @@ class TwoModelLogReg(BaseLogReg):
         """
 
         def __init__(self, e,s):
-            self.e = e.copy()
-            self.s = s.copy()
+            self.e = copy.deepcopy(e)
+            self.s = copy.deepcopy(s)
 
         def __call__(self, X):
             e = self.e.predict_proba(X)
@@ -135,8 +138,8 @@ class TwoModelLogReg(BaseLogReg):
             return (e / (1 - e)) * ((1-s) / s)
 
         def update(self,e,s):
-            self.e = e.copy()
-            self.s = s.copy()
+            self.e = copy.deepcopy(e)
+            self.s = copy.deepcopy(s)
 
     class Y(ClassicLogReg):
         """
@@ -146,6 +149,7 @@ class TwoModelLogReg(BaseLogReg):
 
         def __init__(self,out, learning_rate=0.001, epochs=1000, tolerance=0.000001, penalty=None, solver='adam'):
             super().__init__(learning_rate, epochs, tolerance, penalty, solver)
+            self.out = out
 
         # Weight function unlabeled class
         def w0(self,s,X):
@@ -218,7 +222,7 @@ class TwoModelLogReg(BaseLogReg):
             #Initial guess requried for algorithm
             if self.weights is None or self.bias is None:
                 print("Model is not trained yet, make initial guess based navie pu log reg")
-                return 1/2*(self.s_naive(X) + 1)
+                return 1/2*(self.out.s.s_naive(X) + 1)
             
             linear_model = self.update_linear_model(X)
             return self._activation(linear_model).detach().numpy()
