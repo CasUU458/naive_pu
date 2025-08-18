@@ -1,5 +1,28 @@
-.idea
-.venv
-output/
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Logs and outputs
 logs/
 
+# Data files (large datasets)
+*.parquet
+mnist_784.parquet
+
+# Environment / virtualenv
+.venv/
+env/
+venv/
+*.egg-info/
+.eggs/
+
+# IDE / editor configs
+.idea/
+.vscode/
+
+# System files
+.DS_Store
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/

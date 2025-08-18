@@ -108,13 +108,13 @@ def mock_dataset():
 
 
 def load_breast_cancer():
-    if not os.path.exists('data/breast_cancer.parquet'):
+    if not os.path.exists('breast_cancer.parquet'):
         data = load_breast_cancer_sk()
         df = pd.DataFrame(data.data, columns=data.feature_names)
         df['target'] = data.target
         df.to_parquet('breast_cancer.parquet', engine='pyarrow')
     else:
-        df = pd.read_parquet('data/breast_cancer.parquet', engine='pyarrow')
+        df = pd.read_parquet('breast_cancer.parquet', engine='pyarrow')
     return df
 
 
@@ -131,15 +131,19 @@ def load_mnist(digits: str | None = None):
     df.rename(columns={'class': 'target'}, inplace=True)  # Rename the target column to 'target'
     df["target"] = df["target"].values.to_numpy()
     if digits is not None:
-        d1 = df[df['target'] == digits[0]]
-        d2 = df[df['target'] == digits[1]]
+        d1 = digits[0]
+        d2 = digits[1]
     else:
-        d1 = df[df['target'] == '3']
-        d2 = df[df['target'] == '5']
+        d1 = "3"
+        d2 = "5"
+
+    df1 = df[df['target'] == d1]
+    df2 = df[df['target'] == d2]
 
     # Concatenate the two digits and shuffle the DataFrame
-    df = pd.concat([d1, d2], axis=0).sample(frac=1, random_state=42).reset_index(drop=True)
+    df = pd.concat([df1, df2], axis=0).sample(frac=1, random_state=42).reset_index(drop=True)
     # Convert the target column to numeric values
-    df.loc[df["target"] == '3', "target"] = 0
-    df.loc[df["target"] == '5', "target"] = 1
+    df.loc[df["target"] == d1, "target"] = 0
+    df.loc[df["target"] == d2, "target"] = 1
+    df["target"] = df["target"].astype(int)
     return df

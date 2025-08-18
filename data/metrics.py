@@ -3,10 +3,12 @@ import time
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix,f1_score,accuracy_score, precision_score, recall_score
 from config import CONFIG
 import logging
+import os
 
+#fit the classifier and log its performance
 def do_classification(classifier, name, X_train, y_train, X_test, y_test):
     t = time.time()
     print(f"starting classification for {name}")
@@ -29,12 +31,15 @@ def do_classification(classifier, name, X_train, y_train, X_test, y_test):
 
     return classifier
 
-
-def plot_loss_curves(classic_log_reg, naive_log_reg, c=None):
+# Plot loss curves for the classifiers
+#Plots the log for the classic logistic regression and naive logistic regression
+#For the naive it plots the loss for both the weight optimizer and c optimizer
+#The true value and estimated value of c are also plotted
+def plot_loss_curves(classic_log_reg, naive_log_reg, c=None, path="logs"):
     plt.figure(figsize=(12, 6))
     plt.plot(classic_log_reg.loss_log, label='Classic Log Reg Loss', color='blue', alpha=0.5)
     plt.plot(naive_log_reg.loss_log, label='Naive Log Reg Loss', color='orange', alpha=0.5)
-    plt.plot(naive_log_reg.loss_c_log, label='Naive Log Reg Loss C', color='green', alpha=0.5)
+    plt.plot(naive_log_reg.loss_c_log, label=r'Naive Log Reg $\hat{c}$ Loss', color='green', alpha=0.5)
     plt.plot(naive_log_reg.c_log, label=r"$\hat{c}$", color='red', alpha=0.8, linestyle='--')
     if c is not None:
         plt.axhline(y=c, color='purple', linestyle='--', label='True c')
@@ -43,9 +48,12 @@ def plot_loss_curves(classic_log_reg, naive_log_reg, c=None):
     plt.ylabel('Loss')
     plt.legend()
     plt.grid()
-    plt.savefig(f"output/loss_curves_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}_{time.strftime('%Y-%m-%d_%H-%M-%S')}.png", bbox_inches='tight')
+    plt.savefig(os.path.join(path,f"loss_curves_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}_{time.strftime('%Y-%m-%d_%H-%M-%S')}.png"), bbox_inches='tight')
 
-def plot_probabilities(clf, naive_clf, X_test, y_test):
+# Plot predicted probabilities for each of the instances in the test set
+# Shows whether the model is correct in its predictions
+# plot for both the classif clf and naive
+def plot_probabilities(clf, naive_clf, X_test, y_test,path="logs"):
     x_range = np.arange(X_test.shape[0])
 
     plt.figure()
@@ -57,8 +65,8 @@ def plot_probabilities(clf, naive_clf, X_test, y_test):
     sorted_y_test = y_test.values[sorted_indices]
     correct_pred = np.abs(sorted_probs_classic - sorted_y_test) <= 0.5
     correct_pred = np.where(correct_pred, 'C2', 'C3')
-    plt.scatter(x_range, sorted_probs_classic, c=correct_pred, alpha=0.5,label="Classic", marker="*", s=10)
-    plt.text(x_range[10], sorted_probs_classic[10]-0.04, f"Cl", fontsize=9, ha='left')
+    plt.scatter(x_range, sorted_probs_classic, c=correct_pred, alpha=0.9,label="Classic", marker="*", s=15)
+    plt.text(x_range[3], sorted_probs_classic[10]-0.04, f"Cl", fontsize=9, ha='left')
 
 
     # Naive Logistic Regression probabilities
@@ -68,13 +76,99 @@ def plot_probabilities(clf, naive_clf, X_test, y_test):
     sorted_y_test_naive = y_test.values[sorted_indices_naive]
     correct_pred_naive = np.abs(sorted_probs_naive - sorted_y_test_naive) <= 0.5
     correct_pred_naive = np.where(correct_pred_naive, 'C0', 'C1')
-    plt.scatter(x_range, sorted_probs_naive, c=correct_pred_naive,label="Naive",marker="o", alpha=0.5, s=10)
-    plt.text(x_range[10], sorted_probs_naive[10]-0.04, f"PU", fontsize=9, ha='left')
+    plt.scatter(x_range, sorted_probs_naive, c=correct_pred_naive,label="Naive",marker="o", alpha=0.9, s=15)
+    plt.text(x_range[4], sorted_probs_naive[10]-0.04, f"PU", fontsize=9, ha='left')
     plt.title('Probabilities from Logistic Regression Models')
     plt.xlabel('Sample Index')
     plt.ylabel('Predicted Probability')
-    plt.legend()
+    plt.legend(loc="best")
     plt.grid()
     plt.tight_layout()
     plt.xticks([])
-    plt.savefig(f"output/probabilities_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}_{time.strftime('%Y-%m-%d_%H-%M-%S')}.png", bbox_inches='tight')
+    plt.savefig(os.path.join(path,f"probabilities_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}_{time.strftime('%Y-%m-%d_%H-%M-%S')}.png"), bbox_inches='tight')
+
+
+def plot_metric_bar(classifiers, X_test, y_test, clf_names=None, path="logs"):
+    metrics = ["Accuracy", "Precision", "Recall", "F1-Score"]
+
+    # Default names if not provided
+    if clf_names is None:
+        clf_names = [f"clf_{i}" for i in range(len(classifiers))]
+
+    # Collect metrics for each classifier
+    metrics_values = []
+    for clf in classifiers:
+        y_pred = clf.predict(X_test.values)
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred, pos_label=1, average='binary')
+        recall = recall_score(y_test, y_pred, pos_label=1, average='binary')
+        f1 = f1_score(y_test, y_pred, pos_label=1, average='binary')
+        metrics_values.append([accuracy, precision, recall, f1])
+
+    metrics_values = np.array(metrics_values)  # shape: (n_classifiers, n_metrics)
+
+    # Plot
+    plt.figure(figsize=(10, 6))
+    bar_width = 0.15
+    index = np.arange(len(metrics))
+
+    for i, (clf_name, values) in enumerate(zip(clf_names, metrics_values)):
+        bars = plt.bar(index + i * bar_width, values, bar_width, label=clf_name)
+
+        # Add text labels on top of bars
+        for bar, val in zip(bars, values):
+            plt.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.01,
+                f"{val:.2f}",
+                ha='center', va='bottom', fontsize=8
+            )
+
+    plt.xlabel('Metrics')
+    plt.ylabel('Scores')
+    plt.title('Comparison of Classification Metrics')
+    plt.xticks(index + bar_width * (len(classifiers) - 1) / 2, metrics)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(
+        os.path.join(
+            path,
+            f"metrics_comparison_{'_'.join(clf_names)}_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"
+        ),
+        bbox_inches='tight'
+    )
+
+
+def plot_feature_weights(clf,feature_names,top_n=None,path="logs"):
+    bias = clf.get_bias()
+    weights = clf.get_weights()
+    weights_abs = np.abs(weights)
+    assert len(weights) == len(feature_names), "Number of weights must match number of feature names"
+    assert type(feature_names) == np.ndarray, "Feature names must be a numpy array"
+
+    weights = np.insert(weights,0,bias)
+    weights_abs= np.insert(weights_abs,0,np.abs(bias))
+    feature_names = np.insert(feature_names, 0, "bias")
+
+    df = pd.DataFrame({
+        'feature': feature_names,
+        'weight': weights,
+        'abs_weight': weights_abs
+    })
+
+    df = df.sort_values(by='abs_weight', ascending=False)
+    df = pd.concat([
+        df[df["feature"] == "bias"],
+        df[df["feature"] != "bias"]
+    ])
+
+    plt.figure(figsize=(10, 6))
+
+    if top_n is None or top_n > len(df):
+        top_n = len(df)
+
+    plt.barh(df['feature'].iloc[:top_n], df['weight'].iloc[:top_n],color='skyblue')
+    plt.xlabel('Feature Importance')
+    plt.title('Feature Importance from Logistic Regression')
+    plt.tight_layout()
+    plt.savefig(os.path.join(path,f"feature_weights_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
