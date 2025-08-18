@@ -66,7 +66,10 @@ def experiment():
     clf = do_classification(ClassicLogReg(epochs=CONFIG.EPOCHS, learning_rate=CONFIG.LEARNING_RATE,solver=CONFIG.solver,penalty=CONFIG.penalty), "Classic Logistic Regression", X_train, y_train, X_test, y_test)
 
     # Fit the Sklearn Logistic Regression model as a baseline
-    sk_clf = do_classification(SklearnLogisticRegression(penalty=None, max_iter=CONFIG.EPOCHS), "Sklearn Logistic Regression", X_train, y_train, X_test, y_test)
+
+    clf = TwoModelLogReg(epochs=CONFIG.EPOCHS, learning_rate=CONFIG.LEARNING_RATE,penalty=CONFIG.penalty,solver=CONFIG.solver)
+    sk_clf = do_classification(clf, "Two Model Logistic Regression", X_train, y_train, X_test, y_test)
+    # sk_clf = do_classification(SklearnLogisticRegression(penalty=None, max_iter=CONFIG.EPOCHS), "Sklearn Logistic Regression", X_train, y_train, X_test, y_test)
 
     # Fit the Naive Logistic Regression model as a baseline
     naive_clf = do_classification(NaiveLogReg(epochs=CONFIG.EPOCHS, learning_rate=CONFIG.LEARNING_RATE,learning_rate_c=CONFIG.LEARNING_RATE_C,c_estimate=CONFIG.INITIAL_GUESS_C,solver=CONFIG.solver,penalty=CONFIG.penalty), "Naive Logistic Regression", X_train, y_train, X_test, y_test)
@@ -86,21 +89,21 @@ def experiment():
     plt.show()
 
 if __name__ == "__main__":
-    # experiment()
+    experiment()
 
-    data = get_pd_dataset(name=CONFIG.DATASET_NAME)
+    # data = get_pd_dataset(name=CONFIG.DATASET_NAME)
 
-    #preprocess and split the dataset into train an test data
-    X_train, y_train, X_test, y_test = prepare_and_split_data(data = data,
-                                                            test_size=CONFIG.TEST_SIZE,
-                                                            c=CONFIG.c,
-                                                            labeling_mechanism=CONFIG.LABELING_MECHANISM,
-                                                            train_label_distribution=CONFIG.TRAIN_LABEL_DISTRIBUTION,
-                                                            test_label_distribution=CONFIG.TEST_LABEL_DISTRIBUTION,
-                                                            scale_data=CONFIG.SCALE_DATA)
+    # #preprocess and split the dataset into train an test data
+    # X_train, y_train, X_test, y_test = prepare_and_split_data(data = data,
+    #                                                         test_size=CONFIG.TEST_SIZE,
+    #                                                         c=CONFIG.c,
+    #                                                         labeling_mechanism=CONFIG.LABELING_MECHANISM,
+    #                                                         train_label_distribution=CONFIG.TRAIN_LABEL_DISTRIBUTION,
+    #                                                         test_label_distribution=CONFIG.TEST_LABEL_DISTRIBUTION,
+    #                                                         scale_data=CONFIG.SCALE_DATA)
 
-    print(X_train.shape, y_train.shape)
+    # print(X_train.shape, y_train.shape)
 
 
-    clf = TwoModelLogReg()
-    clf = do_classification(clf, "Two Model Logistic Regression", X_train, y_train, X_test, y_test)
+    # clf = TwoModelLogReg()
+    # clf = do_classification(clf, "Two Model Logistic Regression", X_train, y_train, X_test, y_test)

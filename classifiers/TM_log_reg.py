@@ -11,7 +11,7 @@ import time
 import logging
 
 class TwoModelLogReg(BaseLogReg):
-    def __init__(self, learning_rate=0.001, epochs=1000, tolerance=1e-6,penalty=None,solver='adam',alpha=0.5,epsilon=1e-8):
+    def __init__(self, learning_rate=0.001, epochs=300, tolerance=1e-6,penalty=None,solver='adam',alpha=0.5,epsilon=1e-8):
 
         super().__init__(learning_rate, epochs, tolerance, _sigmoid,penalty,solver)
         self.naive_clf = NaiveLogReg(epochs=300,penalty="l2",solver="adam")
@@ -40,7 +40,7 @@ class TwoModelLogReg(BaseLogReg):
 
         converge_treshold = 1
 
-        while self.iter < self.epochs and converge_treshold > self.epsilon:
+        while self.iter < self.epochs:
 
             self.y.fit(X, s)
 
@@ -50,14 +50,16 @@ class TwoModelLogReg(BaseLogReg):
             p = self.define_psuedo_set(X,s, threshold)
 
 
-            self.e.fit(X, p)
+            self.e.fit(X[p],s[p])
 
-            self.s.update(self.e, self.y)
-            self.OR.update(self.e, self.s)
+            # self.s.update(self.e, self.y)
+            # self.OR.update(self.e, self.s)
 
             self.iter += 1
             converge_treshold = 1
-        
+
+            if self.iter % 100 == 0:
+                print(f"Iteration {self.iter}")
 
         elapsed = time.perf_counter() - start
         logging.info(f"ClassicLogReg completed in {elapsed:.4f} seconds")
@@ -71,14 +73,15 @@ class TwoModelLogReg(BaseLogReg):
         return array of indices for possible positive samples
         """
         p = np.zeros(len(X), dtype=int)
-        for i,instance in enumerate(zip(X, s)):
-            if instance[1] == 1:
-                p[i] = 1
+        for idx,instance in enumerate(zip(X, s)):
+            if instance[1] == 1: #label
+                p[idx] = 1
             else:
-                if self.y.predict_proba(instance[0]) > threshold:
-                    p[i] = 1
-        return p
-    
+                if self.y.predict_proba(instance[0]) > threshold: # 
+                    p[idx] = 1
+        
+        p_indices = p > 0
+        return p_indices
 
 
     def calc_threshold(self,pred):
@@ -103,8 +106,8 @@ class TwoModelLogReg(BaseLogReg):
 
         def __init__(self, out, e, y):
             self.out = out
-            self.e = copy.deepcopy(e)
-            self.y = copy.deepcopy(y)
+            self.e = e
+            self.y = y
 
         def __call__(self, X):
             
@@ -117,9 +120,9 @@ class TwoModelLogReg(BaseLogReg):
         def s_naive(self,X):
             return self.out.naive_clf.predict_label_proba(X)
 
-        def update(self,e,y):
-            self.e = copy.deepcopy(e)
-            self.y = copy.deepcopy(y)
+        # def update(self,e,y):
+        #     self.e = copy.deepcopy(e)
+        #     self.y = copy.deepcopy(y)
 
     class OddsRatio():
         """
@@ -129,17 +132,17 @@ class TwoModelLogReg(BaseLogReg):
         """
 
         def __init__(self, e,s):
-            self.e = copy.deepcopy(e)
-            self.s = copy.deepcopy(s)
+            self.e = e
+            self.s = s
 
         def __call__(self, X):
             e = self.e.predict_proba(X)
             s = self.s(X)
             return (e / (1 - e)) * ((1-s) / s)
 
-        def update(self,e,s):
-            self.e = copy.deepcopy(e)
-            self.s = copy.deepcopy(s)
+        # def update(self,e,s):
+        #     self.e = copy.deepcopy(e)
+        #     self.s = copy.deepcopy(s)
 
     class Y(ClassicLogReg):
         """
@@ -147,7 +150,7 @@ class TwoModelLogReg(BaseLogReg):
         Weights are based on the odds ratio 
         """
 
-        def __init__(self,out, learning_rate=0.001, epochs=1000, tolerance=0.000001, penalty=None, solver='adam'):
+        def __init__(self,out, learning_rate=0.001, epochs=300, tolerance=0.01, penalty="l2", solver='adam'):
             super().__init__(learning_rate, epochs, tolerance, penalty, solver)
             self.out = out
 
@@ -191,8 +194,8 @@ class TwoModelLogReg(BaseLogReg):
             for _ in range(self.epochs):
                 linear_model = X_t @ self.weights + self.bias
                 y_predicted = self._activation(linear_model)
-                if _ % 100 == 0:
-                    print(f"Iteration {_}, Loss: {self._weighted_loss(s_t, y_predicted,X).item()}")
+                # if _ % 100 == 0:
+                #     print(f"Iteration {_}, Loss: {self._weighted_loss(s_t, y_predicted,X).item()}")
 
                 loss = self._weighted_loss(s_t, y_predicted,X)
                 loss = penalty(self.penalty, loss, self.weights)
@@ -204,14 +207,14 @@ class TwoModelLogReg(BaseLogReg):
                 self.loss_log[_] = loss.item() # log loss
 
                 if abs(prev_loss - loss.item()) < self.tolerance:
-                    print(f"Converged after {_} iterations")
+                    # print(f"Converged after {_} iterations")
                     break  
                 
                 prev_loss = loss.item()
             return self
 
     class E(ClassicLogReg):
-        def __init__(self,out, learning_rate=0.001, epochs=1000, tolerance=0.000001, penalty=None, solver='adam'):
+        def __init__(self,out, learning_rate=0.001, epochs=300, tolerance=0.01, penalty="l2", solver='adam'):
             super().__init__(learning_rate, epochs, tolerance, penalty, solver)
             self.out = out
 
@@ -221,7 +224,7 @@ class TwoModelLogReg(BaseLogReg):
         def predict_proba(self, X):
             #Initial guess requried for algorithm
             if self.weights is None or self.bias is None:
-                print("Model is not trained yet, make initial guess based navie pu log reg")
+                # print("Model is not trained yet, make initial guess based navie pu log reg")
                 return 1/2*(self.out.s.s_naive(X) + 1)
             
             linear_model = self.update_linear_model(X)

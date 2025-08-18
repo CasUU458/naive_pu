@@ -52,8 +52,8 @@ class ClassicLogReg(BaseLogReg):
         for _ in range(self.epochs):
             linear_model = X_t @ self.weights + self.bias
             y_predicted = self._activation(linear_model)
-            if _ % 100 == 0:
-                print(f"Iteration {_}, Loss: {_loss(y_t, y_predicted).item()}")
+            # if _ % 100 == 0:
+            #     print(f"Iteration {_}, Loss: {_loss(y_t, y_predicted).item()}")
 
             loss = _loss(y_t, y_predicted)
             loss = penalty(self.penalty, loss, self.weights)
@@ -65,7 +65,7 @@ class ClassicLogReg(BaseLogReg):
             self.loss_log[_] = loss.item() # log loss
 
             if abs(prev_loss - loss.item()) < self.tolerance:
-                print(f"Converged after {_} iterations")
+                # print(f"Converged after {_} iterations")
                 break   
 
         return self
