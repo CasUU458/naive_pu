@@ -108,8 +108,8 @@ class ClassicLogReg(BaseLogReg):
                 loss = penalty(self.penalty, loss, self.weights)
                 self.loss_log[_] = loss.item()
 
-            if _ % 100 == 0:
-                print(f"Iteration {_}, Loss: {loss.item()}")
+            # if _ % 100 == 0:
+                # print(f"Iteration {_}, Loss: {loss.item()}")
 
             if abs(prev_loss - loss.item()) < self.tolerance:
                 print(f"Converged after {_} iterations")
@@ -130,3 +130,11 @@ class ClassicLogReg(BaseLogReg):
     def predict_proba(self, X):
         linear_model = self.update_linear_model(X)
         return self._activation(linear_model).detach().numpy()
+
+
+    def predict_torch_proba(self,X_t):
+        with torch.no_grad():      
+            linear_model = X_t @ self.weights + self.bias
+            probs = self._activation(linear_model)
+            return probs
+        

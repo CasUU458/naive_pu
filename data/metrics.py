@@ -53,7 +53,7 @@ def plot_loss_curves(classic_log_reg, naive_log_reg, c=None, path="logs"):
 # Plot predicted probabilities for each of the instances in the test set
 # Shows whether the model is correct in its predictions
 # plot for both the classif clf and naive
-def plot_probabilities(clf, naive_clf, X_test, y_test,path="logs"):
+def plot_probabilities(clf, naive_clf, X_test, y_test,name_1="Classic",name_2="Naive",path="logs"):
     x_range = np.arange(X_test.shape[0])
 
     plt.figure()
@@ -65,7 +65,7 @@ def plot_probabilities(clf, naive_clf, X_test, y_test,path="logs"):
     sorted_y_test = y_test.values[sorted_indices]
     correct_pred = np.abs(sorted_probs_classic - sorted_y_test) <= 0.5
     correct_pred = np.where(correct_pred, 'C2', 'C3')
-    plt.scatter(x_range, sorted_probs_classic, c=correct_pred, alpha=0.9,label="Classic", marker="*", s=15)
+    plt.scatter(x_range, sorted_probs_classic, c=correct_pred, alpha=0.9,label=name_1, marker="*", s=15)
     plt.text(x_range[3], sorted_probs_classic[10]-0.04, f"Cl", fontsize=9, ha='left')
 
 
@@ -76,16 +76,16 @@ def plot_probabilities(clf, naive_clf, X_test, y_test,path="logs"):
     sorted_y_test_naive = y_test.values[sorted_indices_naive]
     correct_pred_naive = np.abs(sorted_probs_naive - sorted_y_test_naive) <= 0.5
     correct_pred_naive = np.where(correct_pred_naive, 'C0', 'C1')
-    plt.scatter(x_range, sorted_probs_naive, c=correct_pred_naive,label="Naive",marker="o", alpha=0.9, s=15)
+    plt.scatter(x_range, sorted_probs_naive, c=correct_pred_naive,label=name_2,marker="o", alpha=0.9, s=15)
     plt.text(x_range[4], sorted_probs_naive[10]-0.04, f"PU", fontsize=9, ha='left')
-    plt.title('Probabilities from Logistic Regression Models')
+    plt.title(f'Probabilities from Logistic Regression Models {name_1} and {name_2}')
     plt.xlabel('Sample Index')
     plt.ylabel('Predicted Probability')
     plt.legend(loc="best")
     plt.grid()
     plt.tight_layout()
     plt.xticks([])
-    plt.savefig(os.path.join(path,f"probabilities_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}_{time.strftime('%Y-%m-%d_%H-%M-%S')}.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(path,f"probabilities_{name_1}_{name_2}_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}_{time.strftime('%Y-%m-%d_%H-%M-%S')}.png"), bbox_inches='tight')
 
 
 def plot_metric_bar(classifiers, X_test, y_test, clf_names=None, path="logs"):
@@ -139,7 +139,7 @@ def plot_metric_bar(classifiers, X_test, y_test, clf_names=None, path="logs"):
     )
 
 
-def plot_feature_weights(clf,feature_names,top_n=None,path="logs"):
+def plot_feature_weights(clf,feature_names,top_n=None,name="clf",path="logs"):
     bias = clf.get_bias()
     weights = clf.get_weights()
     weights_abs = np.abs(weights)
@@ -169,6 +169,70 @@ def plot_feature_weights(clf,feature_names,top_n=None,path="logs"):
 
     plt.barh(df['feature'].iloc[:top_n], df['weight'].iloc[:top_n],color='skyblue')
     plt.xlabel('Feature Importance')
-    plt.title('Feature Importance from Logistic Regression')
+    plt.title(f'Feature Importance from Logistic Regression - {name}')
     plt.tight_layout()
-    plt.savefig(os.path.join(path,f"feature_weights_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(path,f"feature_weights_{name}_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
+
+
+def plot_validation(clf,path="logs"):
+    if clf.val_log is None:
+        logging.warning("No validation logs available.")
+
+    val_log = clf.get_validation_logs()
+    val_log = np.array(val_log)
+    df = pd.DataFrame(val_log, columns=["name", "accuracy", "precision", "recall", "f1"])
+    df.iloc[:, 1:] = df.iloc[:, 1:].astype(float)
+    y = df.loc[df["name"] == "y(X)"].reset_index(drop=True)
+    e = df.loc[df["name"] == "e(X)"].reset_index(drop=True)
+    threshold = df.loc[df["name"] == "threshold","accuracy"].reset_index(drop=True)
+    or_ = df.loc[df["name"] == "OR","accuracy"].reset_index(drop=True)
+    index = y.index
+    # y(x)
+    plt.figure(figsize=(10, 6))
+    plt.plot(index,y["accuracy"], label="Accuracy", linestyle="--",alpha=0.3)
+    plt.plot(index,y["precision"], label="Precision", linestyle="--",alpha=0.7)
+    plt.plot(index,y["recall"], label="Recall", linestyle="--",alpha=0.7)
+    plt.plot(index,y["f1"], label="F1-Score", linestyle="-",alpha=0.7,lw=2)
+    plt.legend()
+    plt.title(f"Validation Metrics for y(X) - {CONFIG.DATASET_NAME}")
+    plt.tight_layout()
+    plt.xlabel("epoch")
+    plt.ylabel("Score")
+    plt.ylim(0,1.1)
+    plt.yticks(np.arange(0, 1.1, 0.1))
+    plt.savefig(os.path.join(path,f"validation_metrics_y(X)_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
+
+    # e(x)
+    plt.figure(figsize=(10, 6))
+    index = e.index
+    plt.plot(index,e["accuracy"], label="Accuracy", linestyle="--",alpha=0.3)
+    plt.plot(index,e["precision"], label="Precision", linestyle="--",alpha=0.7)
+    plt.plot(index,e["recall"], label="Recall", linestyle="--",alpha=0.7)
+    plt.plot(index,e["f1"], label="F1-Score", linestyle="-",alpha=0.7,lw=2)
+    plt.legend()
+    plt.title(f"Validation Metrics for e(X) - {CONFIG.DATASET_NAME}")
+    plt.tight_layout()
+    plt.xlabel("epoch")
+    plt.ylabel("Score")
+    plt.ylim(0,1.1)
+    plt.yticks(np.arange(0, 1.1, 0.1))
+
+    plt.savefig(os.path.join(path,f"validation_metrics_e(X)_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
+
+    plt.figure(figsize=(10, 6))
+    index = threshold.index
+    plt.plot(index,threshold, label="Threshold", linestyle="-",alpha=0.7)
+    plt.legend()
+    plt.title(f"TM Threshold - {CONFIG.DATASET_NAME}")
+    plt.xlabel("epoch")
+    plt.ylabel("Value")
+    plt.savefig(os.path.join(path,f"TM_threshold_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
+
+    plt.figure(figsize=(10, 6))
+    index = or_.index
+    plt.plot(index, or_, label="OR", linestyle="-",alpha=0.7)
+    plt.legend()
+    plt.title(f"TM OR - {CONFIG.DATASET_NAME}")
+    plt.xlabel("epoch")
+    plt.ylabel("Value")
+    plt.savefig(os.path.join(path,f"TM_OR_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')

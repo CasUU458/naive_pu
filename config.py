@@ -6,7 +6,8 @@ class Config:
         if not hasattr(cls, 'instance'):
             cls.instance = super(Config, cls).__new__(cls)
 
-            cls.c = 0.3
+            cls.label_frequency = 0.2
+            cls.c = cls.label_frequency
 
             cls.RANDOM_SEED = False
             cls.TORCH_DEVICE = 'cpu'
@@ -26,7 +27,8 @@ class Config:
             cls.LEARNING_RATE_C =  cls.LEARNING_RATE_C_modifier*1 / cls.EPOCHS
             cls.penalty = "l2" #None, l2 or "l1"
             cls.solver = 'adam' # lbfgs or adam
-
+            cls.VALIDATION_FRAC = 0.2
+            cls.TM_ALPHA = 0.2
             # state variables
             cls.true_prior_proba = None
             cls.train_prior_proba = None

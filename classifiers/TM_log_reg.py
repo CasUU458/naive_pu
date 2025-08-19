@@ -5,13 +5,14 @@ from classifiers.helpers import _sigmoid,penalty
 from classifiers.base_log_reg import BaseLogReg
 from classifiers.naive_log_reg import NaiveLogReg
 from classifiers.classic_log_reg import ClassicLogReg
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from config import CONFIG
 import copy
 import time
 import logging
 
 class TwoModelLogReg(BaseLogReg):
-    def __init__(self, learning_rate=0.001, epochs=300, tolerance=1e-6,penalty=None,solver='adam',alpha=0.5,epsilon=1e-8):
+    def __init__(self, learning_rate=0.001, epochs=300, tolerance=1e-6,penalty=None,solver='adam',alpha=0.5,epsilon=1e-8,validation=None):
 
         super().__init__(learning_rate, epochs, tolerance, _sigmoid,penalty,solver)
         self.naive_clf = NaiveLogReg(epochs=300,penalty="l2",solver="adam")
@@ -22,38 +23,48 @@ class TwoModelLogReg(BaseLogReg):
         self.iter = 0 #iteration counter
         self.alpha = alpha #alpha is the quantile for the threshold 
         self.epsilon = epsilon
-
+        self.val_log = []  
+        self.VAL = [validation[0],validation[1],validation[2]] if validation is not None else None # validation set: X_val, y_val, s_val
+   
     def fit(self,X,s):
         
         """
         Fits the model to the positive and unlabeled training data.
         """
 
+    
+
+
+
         #initialize 
         start = time.perf_counter()
         self.iter = 0
+        # Fit (and validate) the naive classifier
         self.naive_clf.fit(X, s)
+        if self.VAL is not None:
+            self.validate(self.naive_clf,name="y(X)")
+
         self.e = self.E(out=self)
-        self.y = self.Y(out=self)
-        self.s = self.S(self, self.e, self.y)
-        self.OR = self.OddsRatio(self.e, self.s)
+        self.y = self.Y(out=self, learning_rate=self.learning_rate, epochs=self.epochs,penalty=self.penalty,solver=self.solver)
+        self.s = self.S(out=self, e=self.e, y=self.y)
+        self.OR = self.OddsRatio(out=self,e=self.e, s=self.s)
+   
 
         converge_treshold = 1
+        X = torch.as_tensor(X, dtype=torch.float32,device=CONFIG.TORCH_DEVICE)
+        s = torch.as_tensor(s, dtype=torch.float32, device=CONFIG.TORCH_DEVICE)
+
 
         while self.iter < self.epochs:
 
             self.y.fit(X, s)
 
-
-            pred = self.y.predict_proba(X) 
+            pred = self.y.predict_torch_proba(X) 
             threshold = self.calc_threshold(pred)
             p = self.define_psuedo_set(X,s, threshold)
 
 
             self.e.fit(X[p],s[p])
-
-            # self.s.update(self.e, self.y)
-            # self.OR.update(self.e, self.s)
 
             self.iter += 1
             converge_treshold = 1
@@ -61,8 +72,16 @@ class TwoModelLogReg(BaseLogReg):
             if self.iter % 100 == 0:
                 print(f"Iteration {self.iter}")
 
+            if self.VAL is not None:
+                self.validate(self.y,name="y(X)")
+                self.validate(self.e,name="e(X)",label_freq=True)
+                self.val_log.append(("threshold",threshold.detach().numpy(),0,0,0))
+                or_ = np.mean(self.OR(torch.as_tensor(X, dtype=torch.float32)).detach().numpy())
+                self.val_log.append(("OR",or_,0,0,0))
+
+
         elapsed = time.perf_counter() - start
-        logging.info(f"ClassicLogReg completed in {elapsed:.4f} seconds")
+        logging.info(f"TwoModelLogReg completed in {elapsed:.4f} seconds")
         return self
 
     def define_psuedo_set(self, X, s, threshold):
@@ -72,12 +91,12 @@ class TwoModelLogReg(BaseLogReg):
 
         return array of indices for possible positive samples
         """
-        p = np.zeros(len(X), dtype=int)
+        p = torch.zeros(len(X), dtype=int)
         for idx,instance in enumerate(zip(X, s)):
             if instance[1] == 1: #label
                 p[idx] = 1
             else:
-                if self.y.predict_proba(instance[0]) > threshold: # 
+                if self.y.predict_torch_proba(instance[0]) > threshold: # 
                     p[idx] = 1
         
         p_indices = p > 0
@@ -86,13 +105,11 @@ class TwoModelLogReg(BaseLogReg):
 
     def calc_threshold(self,pred):
         
-        pred = np.sort(pred)
-        
+        threshold = torch.quantile(pred, self.alpha)
+    
 
-        return self.quantile(pred)
+        return threshold
 
-    def quantile(self, X):
-        return np.quantile(X, self.alpha)
 
     class S():
         """
@@ -109,20 +126,15 @@ class TwoModelLogReg(BaseLogReg):
             self.e = e
             self.y = y
 
-        def __call__(self, X):
-            
-            if self.out.iter > 0:
-                f = self.y.predict_proba(X)*self.e.predict_proba(X)
-                return f
-            else:
-                return self.s_naive(X)
+        def __call__(self,X):
+            if self.e.weights is None or self.y.weights is None:
+                # print("Model is not trained yet, make initial guess based navie pu log reg")
+                return self.s_naive(X)               
+            return self.e.predict_torch_proba(X)*self.y.predict_torch_proba(X)
 
         def s_naive(self,X):
-            return self.out.naive_clf.predict_label_proba(X)
+            return self.out.naive_clf.predict_torch_label_proba(X)
 
-        # def update(self,e,y):
-        #     self.e = copy.deepcopy(e)
-        #     self.y = copy.deepcopy(y)
 
     class OddsRatio():
         """
@@ -131,18 +143,17 @@ class TwoModelLogReg(BaseLogReg):
 
         """
 
-        def __init__(self, e,s):
+        def __init__(self,out, e,s):
             self.e = e
             self.s = s
-
+            self.out = out
+       
         def __call__(self, X):
-            e = self.e.predict_proba(X)
+            e = self.e.predict_torch_proba(X)
             s = self.s(X)
-            return (e / (1 - e)) * ((1-s) / s)
+            return (e * (1 - s)) / ((1 - e) * s)
 
-        # def update(self,e,s):
-        #     self.e = copy.deepcopy(e)
-        #     self.s = copy.deepcopy(s)
+
 
     class Y(ClassicLogReg):
         """
@@ -150,7 +161,7 @@ class TwoModelLogReg(BaseLogReg):
         Weights are based on the odds ratio 
         """
 
-        def __init__(self,out, learning_rate=0.001, epochs=300, tolerance=0.01, penalty="l2", solver='adam'):
+        def __init__(self,out, learning_rate=0.001, epochs=100, tolerance=0.001, penalty="l2", solver='lbfgs'):
             super().__init__(learning_rate, epochs, tolerance, penalty, solver)
             self.out = out
 
@@ -182,9 +193,6 @@ class TwoModelLogReg(BaseLogReg):
             self.weights = torch.zeros(n_features, device=CONFIG.TORCH_DEVICE, requires_grad=True)
             self.bias = torch.zeros(1, device=CONFIG.TORCH_DEVICE, requires_grad=True)
 
-            X_t = torch.as_tensor(X, dtype=torch.float32,device=CONFIG.TORCH_DEVICE)
-            s_t = torch.as_tensor(s, dtype=torch.float32, device=CONFIG.TORCH_DEVICE)
-
             self.optimizer = torch.optim.Adam([self.weights, self.bias], lr=self.learning_rate)
             
             prev_loss = float('inf')
@@ -192,12 +200,12 @@ class TwoModelLogReg(BaseLogReg):
             self.loss_log = np.zeros(self.epochs)
 
             for _ in range(self.epochs):
-                linear_model = X_t @ self.weights + self.bias
+                linear_model = X @ self.weights + self.bias
                 y_predicted = self._activation(linear_model)
                 # if _ % 100 == 0:
                 #     print(f"Iteration {_}, Loss: {self._weighted_loss(s_t, y_predicted,X).item()}")
 
-                loss = self._weighted_loss(s_t, y_predicted,X)
+                loss = self._weighted_loss(s, y_predicted,X)
                 loss = penalty(self.penalty, loss, self.weights)
 
                 self.optimizer.zero_grad() # reset grads
@@ -214,7 +222,7 @@ class TwoModelLogReg(BaseLogReg):
             return self
 
     class E(ClassicLogReg):
-        def __init__(self,out, learning_rate=0.001, epochs=300, tolerance=0.01, penalty="l2", solver='adam'):
+        def __init__(self,out, learning_rate=0.001, epochs=100, tolerance=0.001, penalty="l2", solver='adam'):
             super().__init__(learning_rate, epochs, tolerance, penalty, solver)
             self.out = out
 
@@ -223,14 +231,43 @@ class TwoModelLogReg(BaseLogReg):
         #
         def predict_proba(self, X):
             #Initial guess requried for algorithm
-            if self.weights is None or self.bias is None:
+            if self.weights is None:
                 # print("Model is not trained yet, make initial guess based navie pu log reg")
-                return 1/2*(self.out.s.s_naive(X) + 1)
+                return 1/2*(self.out.s.s_naive(X).detach().numpy() + 1)
             
             linear_model = self.update_linear_model(X)
             return self._activation(linear_model).detach().numpy()
             #Polynomial estimate of e, see paper 
-            
+
+        def predict_torch_proba(self, X_t):
+            if self.weights is None:
+                # print("Model is not trained yet, make initial guess based navie pu log reg")
+                return 1/2*(self.out.s.s_naive(X_t) + 1)
+            return super().predict_torch_proba(X_t)
+    
+    # VALDIDATION ###########################################################
+
+
+    def validate(self,clf,name,label_freq=False):
+        X_val, y_val, s_val = self.VAL
+
+        if label_freq:
+            y_true = s_val
+        else:
+            y_true = y_val
+
+        y_pred = clf.predict(X_val)
+
+        accuracy = accuracy_score(y_true, y_pred)
+        precision = precision_score(y_true, y_pred, pos_label=1)
+        recall = recall_score(y_true, y_pred, pos_label=1)
+        f1 = f1_score(y_true, y_pred, pos_label=1)
+        self.val_log.append((name,accuracy, precision, recall, f1))
+
+
+        # logging.info(f"{name} - - Validation at iteration {clf.iter}: Accuracy: {accuracy}, Precision: {precision}, Recall: {recall}, F1: {f1}")
+
+    #########################################################################
 
 
     def predict(self, X, threshold=0.5):
@@ -239,6 +276,35 @@ class TwoModelLogReg(BaseLogReg):
     def predict_proba(self,X):
         return self.y.predict_proba(X)
     
+    def get_weights(self):
+        if self.y is None:
+            raise ValueError("Model has not been trained yet. Call fit() before get_weights().")
+        return self.y.get_weights()
 
-# TEST the algorithm
 
+    def get_e_weights(self):
+
+        return self.e.get_weights()
+    
+    def _get_y_clf(self):
+        if self.y is None:
+            raise ValueError("Model has not been trained yet. Call fit() before get_y_clf().")
+        return self.y
+    
+    def _get_e_clf(self):
+        if self.e is None:
+            raise ValueError("Model has not been trained yet. Call fit() before get_e_clf().")
+        return self.e
+
+    def get_validation_logs(self):
+        if self.VAL is None:
+            raise ValueError("Validation set is not available. Make sure to provide a validation set during initialization.")
+        else:
+            return self.val_log
+
+    def validate2log(self):
+        if self.VAL is None:
+            raise ValueError("Validation set is not available. Make sure to provide a validation set during initialization.")
+        else:
+            for i,log in enumerate(self.val_log):
+                logging.info(f"Validation log {i}: {log}")

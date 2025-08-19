@@ -21,6 +21,7 @@ class BaseLogReg(ABC):
 
         self.loss_log = None
 
+        
 
     @abstractmethod
     def fit(self, X, y):
@@ -41,7 +42,7 @@ class BaseLogReg(ABC):
 
 
     def update_linear_model(self, X):
-        X = torch.tensor(X, dtype=torch.float32)
+        X = torch.as_tensor(X, dtype=torch.float32)
 
         if self.weights is None or self.bias is None:
             raise ValueError("Model has not been trained yet. Call fit() before predict().")
@@ -65,3 +66,4 @@ class BaseLogReg(ABC):
         if self.loss_log is None:
             raise ValueError("Loss log is not available. Make sure to call fit() first.")
         return self.loss_log
+    

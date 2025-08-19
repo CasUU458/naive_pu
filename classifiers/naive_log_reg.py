@@ -208,3 +208,6 @@ class NaiveLogReg(BaseLogReg):
         linear_model = self.update_linear_model(X)
         return self._activation(linear_model, self.b).detach().numpy()
         
+    def predict_torch_label_proba(self, X, threshold=0.5):
+        linear_model = self.update_linear_model(X)
+        return self._activation(linear_model, self.b)

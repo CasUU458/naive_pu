@@ -1,5 +1,5 @@
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-
+import numpy as np
 from config import CONFIG
 
 
@@ -53,6 +53,38 @@ def SCAR(df, c):
     return df
 
 
-def SAR(df, c):
+def SAR(df, c,n_features=1):
     # P(s =1 "| X")
-    raise NotImplementedError("Error: SAR is not implemented")
+
+    if n_features > df.shape[1]-1:
+        raise ValueError("Error: n_features is larger than the number of features in the DataFrame.")
+        # print(f"Warning: n_features is larger than the number of features in the DataFrame. Setting n_features from {n_features} to {df.shape[1]-1}.")
+        # n_features = df.shape[1]-1
+    features = df.select_dtypes(include=[np.number]).drop(columns=["target"]).sample(n=n_features, axis=1, random_state=CONFIG.SEED).columns.tolist()
+    print(f"Using features: {features} for SAR labeling mechanism with c={c}")
+    X = df[features]
+    X = X.fillna(0)
+    scores = X.abs().mean(axis=1)
+    scores -= scores.min()
+    scores /= scores.max()
+    
+    print(scores.mean())
+    rng = np.random.default_rng(CONFIG.SEED)
+    
+    
+
+    pos_idx = df[df['target'] == 1].index
+    scores = scores.loc[pos_idx]
+    requested_n = int(len(scores) * c)
+    scores /= scores.sum()
+    if requested_n < len(scores):
+        sampled = rng.choice(scores.index, size=requested_n, replace=False, p=scores)
+    else:
+        sampled = scores.index
+    
+    df["PU"] = 0
+    df.loc[sampled, "PU"] = 1
+    # df.loc[(df["PU"] ==1) & (df["target"] == 0), "PU"] = 0 #only positive samples
+    df["PU"] = df["PU"].astype(int)
+    return df
+
