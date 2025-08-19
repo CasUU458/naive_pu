@@ -35,7 +35,7 @@ class Config:
             cls.test_prior_proba = None
             cls.true_train_labels = None
             cls.PU_test_labels = None
-
+            cls.dominant_features = None
         return cls.instance
 
     @property

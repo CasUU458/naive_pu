@@ -50,10 +50,10 @@ def SCAR(df, c):
     df["PU"] = df["PU"].fillna(0)
     df["PU"] = df["PU"].astype(int)
 
-    return df
+    return df.reset_index(drop=True)
 
 
-def SAR(df, c,n_features=1):
+def SAR(df, c,n_features=1,strength=10):
     # P(s =1 "| X")
 
     if n_features > df.shape[1]-1:
@@ -61,30 +61,45 @@ def SAR(df, c,n_features=1):
         # print(f"Warning: n_features is larger than the number of features in the DataFrame. Setting n_features from {n_features} to {df.shape[1]-1}.")
         # n_features = df.shape[1]-1
     features = df.select_dtypes(include=[np.number]).drop(columns=["target"]).sample(n=n_features, axis=1, random_state=CONFIG.SEED).columns.tolist()
-    print(f"Using features: {features} for SAR labeling mechanism with c={c}")
-    X = df[features]
-    X = X.fillna(0)
-    scores = X.abs().mean(axis=1)
-    scores -= scores.min()
-    scores /= scores.max()
-    
-    print(scores.mean())
+    CONFIG.dominant_features = features 
+    probs = np.zeros((len(features),df.shape[0]))
+    for i,feature in enumerate(features):
+        values = df[feature].values
+        idx = np.argsort(values)
+        #boolean choice to go reverse importance
+        # if np.random.rand() < 0.5:
+        #     idx = idx[::-1]
+        probs[i, idx] = (strength**np.linspace(0, 1, len(idx))-1)/(strength-1)
+    probs = probs.sum(axis=0)
+ 
     rng = np.random.default_rng(CONFIG.SEED)
     
     
 
     pos_idx = df[df['target'] == 1].index
-    scores = scores.loc[pos_idx]
-    requested_n = int(len(scores) * c)
-    scores /= scores.sum()
-    if requested_n < len(scores):
-        sampled = rng.choice(scores.index, size=requested_n, replace=False, p=scores)
+    probs = probs[pos_idx]
+    probs /= probs.sum()
+    requested_n = int(len(probs) * c)
+
+    if requested_n < len(probs):
+        sampled = rng.choice(pos_idx, size=requested_n, replace=False, p=probs)
     else:
-        sampled = scores.index
+        raise ValueError("Error: requested label_distribution is larger than the number of positives.")
     
     df["PU"] = 0
     df.loc[sampled, "PU"] = 1
     # df.loc[(df["PU"] ==1) & (df["target"] == 0), "PU"] = 0 #only positive samples
     df["PU"] = df["PU"].astype(int)
-    return df
+
+    # simple
+    # feature = df.select_dtypes(include=[np.number]).drop(columns=["target"]).sample(n=1, axis=1, random_state=CONFIG.SEED).columns.tolist()
+    # CONFIG.dominant_features = feature
+    # df_pos = df.loc[df['target'] == 1]
+    # df_pos = df_pos.sort_values(by=feature, ascending=False).iloc[-int(len(df_pos) * c):]
+    # df_pos_ix = df_pos.index
+    # df["PU"] = 0
+    # df.loc[df_pos_ix, "PU"] = 1
+    # df["PU"] = df["PU"].astype(int)
+
+    return df.reset_index(drop=True)
 

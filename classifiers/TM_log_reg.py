@@ -61,10 +61,10 @@ class TwoModelLogReg(BaseLogReg):
 
             pred = self.y.predict_torch_proba(X) 
             threshold = self.calc_threshold(pred)
-            p = self.define_psuedo_set(X,s, threshold)
+            p = self.define_psuedo_set(X[p],s[p], threshold)
 
 
-            self.e.fit(X[p],s[p])
+            self.e.fit(X,s)
 
             self.iter += 1
             converge_treshold = 1

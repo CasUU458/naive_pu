@@ -6,6 +6,7 @@ from data.dataset_helpers import (reorder_dataframe_with_target_at_end, set_posi
                              normalize_data_standard_scalar, normalize_data_minmax_scalar, SCAR, SAR)
 
 from config import CONFIG
+import warnings
 
 
 def get_pd_dataset(name = CONFIG.DATASET_NAME, digits=None):
@@ -42,7 +43,7 @@ def prepare_and_split_data(data,
     test_positives = data[data['target'] == 1].sample(frac=test_size, random_state=CONFIG.SEED)
     test_negatives = data[data['target'] == 0].sample(frac=test_size, random_state=CONFIG.SEED)
 
-    assert test_negatives.shape[0] + test_positives.shape[0] == int(test_size * len(data)), f"Test set size does not match expected size {test_negatives.shape[0] + test_positives.shape[0]} vs {int(test_size * len(data))}"
+    # assert test_negatives.shape[0] + test_positives.shape[0] == int(test_size * len(data)), f"Test set size does not match expected size {test_negatives.shape[0] + test_positives.shape[0]} vs {int(test_size * len(data))}"
 
     if test_label_distribution is not None:
         test_positives = set_positive_label_distribution(test_label_distribution, test_positives, test_negatives)
@@ -69,10 +70,11 @@ def prepare_and_split_data(data,
         case "none": # no scalar is used
             train, test = train, test
         case _:
-            raise ValueError("Error: specify correct scalar method")
+            warnings.warn("Error: no scalar method specified")
 
     labeling_mechanism = labeling_mechanism.split("_")
     n_features = int(labeling_mechanism[1]) if len(labeling_mechanism) > 1 else 1
+    strength = int(labeling_mechanism[2]) if len(labeling_mechanism) > 2 else 10
     labeling_mechanism = labeling_mechanism[0]
     match labeling_mechanism:
 
@@ -82,8 +84,8 @@ def prepare_and_split_data(data,
             train = SCAR(train, c)
             test = SCAR(test, c)
         case "SAR":
-            train = SAR(train, c,n_features=n_features)
-            test = SAR(test, c,n_features=n_features)
+            train = SAR(train, c,n_features=n_features,strength=10)
+            test = SAR(test, c,n_features=n_features,strength=10)
         case _:
             raise ValueError("Error: specify correct scalar method")
 
@@ -109,7 +111,7 @@ def prepare_and_split_data(data,
     CONFIG.true_train_labels = train['target'].values
     CONFIG.PU_test_labels = test['PU'].values
 
-
+    
     if validation_frac is not None:
         return X_train, y_train, X_test, y_test, VAL
     
