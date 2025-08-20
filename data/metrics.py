@@ -185,6 +185,7 @@ def plot_validation(clf,path="logs"):
     y = df.loc[df["name"] == "y(X)"].reset_index(drop=True)
     e = df.loc[df["name"] == "e(X)"].reset_index(drop=True)
     threshold = df.loc[df["name"] == "threshold","accuracy"].reset_index(drop=True)
+    size_p = df.loc[df["name"] == "size_p","accuracy"].reset_index(drop=True)
     or_ = df.loc[df["name"] == "OR","accuracy"].reset_index(drop=True)
     index = y.index
     # y(x)
@@ -236,3 +237,12 @@ def plot_validation(clf,path="logs"):
     plt.xlabel("epoch")
     plt.ylabel("Value")
     plt.savefig(os.path.join(path,f"TM_OR_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
+
+    plt.figure(figsize=(10, 6))
+    index = size_p.index
+    plt.plot(index, size_p, label="Size of P", linestyle="-",alpha=0.7)
+    plt.legend()
+    plt.title(f"TM Size of P - {CONFIG.DATASET_NAME}")
+    plt.xlabel("epoch")
+    plt.ylabel("Value")
+    plt.savefig(os.path.join(path,f"TM_size_p_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')

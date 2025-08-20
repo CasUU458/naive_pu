@@ -10,6 +10,7 @@ from config import CONFIG
 import copy
 import time
 import logging
+from sklearn.linear_model import LogisticRegression
 
 class TwoModelLogReg(BaseLogReg):
     def __init__(self, learning_rate=0.001, epochs=300, tolerance=1e-6,penalty=None,solver='adam',alpha=0.5,epsilon=1e-8,validation=None):
@@ -44,7 +45,7 @@ class TwoModelLogReg(BaseLogReg):
         if self.VAL is not None:
             self.validate(self.naive_clf,name="y(X)")
 
-        self.e = self.E(out=self)
+        self.e = self.E(out=self, learning_rate=self.learning_rate, epochs=self.epochs,penalty=self.penalty,solver=self.solver)
         self.y = self.Y(out=self, learning_rate=self.learning_rate, epochs=self.epochs,penalty=self.penalty,solver=self.solver)
         self.s = self.S(out=self, e=self.e, y=self.y)
         self.OR = self.OddsRatio(out=self,e=self.e, s=self.s)
@@ -61,10 +62,10 @@ class TwoModelLogReg(BaseLogReg):
 
             pred = self.y.predict_torch_proba(X) 
             threshold = self.calc_threshold(pred)
-            p = self.define_psuedo_set(X[p],s[p], threshold)
+            p = self.define_psuedo_set(X,s, threshold)
 
 
-            self.e.fit(X,s)
+            self.e.fit(X[p],s[p])
 
             self.iter += 1
             converge_treshold = 1
@@ -78,6 +79,7 @@ class TwoModelLogReg(BaseLogReg):
                 self.val_log.append(("threshold",threshold.detach().numpy(),0,0,0))
                 or_ = np.mean(self.OR(torch.as_tensor(X, dtype=torch.float32)).detach().numpy())
                 self.val_log.append(("OR",or_,0,0,0))
+                self.val_log.append(("size_p",np.sum(p.detach().numpy()),0,0,0))
 
 
         elapsed = time.perf_counter() - start
@@ -149,9 +151,9 @@ class TwoModelLogReg(BaseLogReg):
             self.out = out
        
         def __call__(self, X):
-            e = self.e.predict_torch_proba(X)
-            s = self.s(X)
-            return (e * (1 - s)) / ((1 - e) * s)
+            e = self.e.predict_torch_proba(X).clamp(1e-8, 1-1e-8)
+            s_hat = self.s(X).clamp(1e-8, 1-1e-8)
+            return ((1 - e) / e) * (s_hat / (1 - s_hat))
 
 
 
@@ -174,13 +176,13 @@ class TwoModelLogReg(BaseLogReg):
             return s+(1-s)*self.out.OR(X)
 
         # Loss is adjusted based on class of samples
-        def _weighted_loss(self,s,y_pred,X):
+        def _weighted_loss(self,y_pred,X):
             eps = 1e-15  # to avoid log(0), numerical stability, small constant
             # ensure y_pred is in the range [eps, 1-eps]
             #clamp_min y_pred to avoid log(0)
 
-            s = s.clamp(eps, 1. - eps)
-            W = self.w1(s, X)* torch.log(y_pred) + self.w0(s, X)* torch.log(1. - y_pred)
+            s_pred = self.out.s(X).clamp(eps, 1 - eps)  # clamp to avoid log(0)
+            W = self.w1(s_pred, X)* torch.log(y_pred) + self.w0(s_pred, X)* torch.log(1. - y_pred)
             return -torch.mean(W)      
         
 
@@ -205,7 +207,7 @@ class TwoModelLogReg(BaseLogReg):
                 # if _ % 100 == 0:
                 #     print(f"Iteration {_}, Loss: {self._weighted_loss(s_t, y_predicted,X).item()}")
 
-                loss = self._weighted_loss(s, y_predicted,X)
+                loss = self._weighted_loss(y_predicted,X)
                 loss = penalty(self.penalty, loss, self.weights)
 
                 self.optimizer.zero_grad() # reset grads
@@ -225,9 +227,8 @@ class TwoModelLogReg(BaseLogReg):
         def __init__(self,out, learning_rate=0.001, epochs=100, tolerance=0.001, penalty="l2", solver='adam'):
             super().__init__(learning_rate, epochs, tolerance, penalty, solver)
             self.out = out
-
-
-        #Adjusted prediction versus classic logreg 
+        
+        #Adjusted prediction versus classic logreg
         #
         def predict_proba(self, X):
             #Initial guess requried for algorithm
@@ -241,11 +242,13 @@ class TwoModelLogReg(BaseLogReg):
 
         def predict_torch_proba(self, X_t):
             if self.weights is None:
-                # print("Model is not trained yet, make initial guess based navie pu log reg")
                 return 1/2*(self.out.s.s_naive(X_t) + 1)
             return super().predict_torch_proba(X_t)
+        
+        def predict(self, X, threshold=0.5):
+            return super().predict(X, threshold)
     
-    # VALDIDATION ###########################################################
+        # VALDIDATION ###########################################################
 
 
     def validate(self,clf,name,label_freq=False):
