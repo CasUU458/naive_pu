@@ -13,7 +13,7 @@ class ClassicLogReg(BaseLogReg):
         super().__init__(learning_rate, epochs, tolerance, _sigmoid,penalty,solver)
 
 
-    def fit(self,X,y):
+    def fit(self,X,y, **kwargs):
         """
         Fit the model to the training data.
         lbfgs solver requries different training loop than adam
@@ -66,7 +66,9 @@ class ClassicLogReg(BaseLogReg):
 
             if abs(prev_loss - loss.item()) < self.tolerance:
                 # print(f"Converged after {_} iterations")
-                break   
+                break
+
+            prev_loss = loss.item()
 
         return self
 
@@ -137,4 +139,3 @@ class ClassicLogReg(BaseLogReg):
             linear_model = X_t @ self.weights + self.bias
             probs = self._activation(linear_model)
             return probs
-        

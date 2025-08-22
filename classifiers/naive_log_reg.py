@@ -36,7 +36,7 @@ class NaiveLogReg(BaseLogReg):
     
 
 
-    def fit(self, X, y):
+    def fit(self, X, y, **kwargs):
         """
         Fit the model to the training data.
         lbfgs solver requries different training loop than adam

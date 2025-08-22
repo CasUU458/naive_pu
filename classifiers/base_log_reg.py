@@ -1,9 +1,5 @@
 from abc import abstractmethod, ABC
-
-import numpy as np
 import torch
-
-from classifiers.helpers import b2c
 
 
 class BaseLogReg(ABC):
@@ -24,7 +20,7 @@ class BaseLogReg(ABC):
         
 
     @abstractmethod
-    def fit(self, X, y):
+    def fit(self, X, y, **kwargs):
         # require all subclasses to override this method.
         pass
     
