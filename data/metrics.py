@@ -246,3 +246,4 @@ def plot_validation(clf,path="logs"):
     plt.xlabel("epoch")
     plt.ylabel("Value")
     plt.savefig(os.path.join(path,f"TM_size_p_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
+

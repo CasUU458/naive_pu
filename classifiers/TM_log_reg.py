@@ -13,7 +13,7 @@ import logging
 from sklearn.linear_model import LogisticRegression
 
 class TwoModelLogReg(BaseLogReg):
-    def __init__(self, learning_rate=0.001, epochs=300, tolerance=1e-6,penalty=None,solver='adam',alpha=0.5,epsilon=1e-8,validation=None):
+    def __init__(self, learning_rate=0.001, epochs=300, tolerance=1e-6,penalty=None,solver='adam',alpha=None,epsilon=1e-8,validation=None):
 
         super().__init__(learning_rate, epochs, tolerance, _sigmoid,penalty,solver)
         self.naive_clf = NaiveLogReg(epochs=300,penalty="l2",solver="adam")
@@ -45,30 +45,48 @@ class TwoModelLogReg(BaseLogReg):
         if self.VAL is not None:
             self.validate(self.naive_clf,name="y(X)")
 
-        self.e = self.E(out=self, learning_rate=self.learning_rate, epochs=self.epochs,penalty=self.penalty,solver=self.solver)
+        if self.alpha is None:
+            self.alpha = self.naive_clf.get_c_hat() #get the c_hat from the naive classifier
+        s_pred = self.naive_clf.predict_torch_label_proba(X)
+         #get the probabilities of the naive classifier
+        e_pred = 1./2. * (s_pred + 1) #initial guess for e(x), see paper
+        OR = self.OddsRatio(e_pred,s_pred)
+
+        self.e = LogisticRegression()
         self.y = self.Y(out=self, learning_rate=self.learning_rate, epochs=self.epochs,penalty=self.penalty,solver=self.solver)
-        self.s = self.S(out=self, e=self.e, y=self.y)
-        self.OR = self.OddsRatio(out=self,e=self.e, s=self.s)
+        
+       
    
 
-        converge_treshold = 1
         X = torch.as_tensor(X, dtype=torch.float32,device=CONFIG.TORCH_DEVICE)
         s = torch.as_tensor(s, dtype=torch.float32, device=CONFIG.TORCH_DEVICE)
+        prev = np.inf
+
+        while self.iter < self.epochs*0.25:
+
+            loss = self.y.fit(X, s,OR)
+
+            y_pred = self.y.predict_torch_proba(X) 
+
+            y_pred_positive = y_pred[s == 1] #predictions for positive samples
+            threshold = torch.quantile(y_pred_positive, self.alpha) #calculate threshold based on alpha quantile
 
 
-        while self.iter < self.epochs:
+            p = self.pseudo_indices(y_pred,s, threshold)
 
-            self.y.fit(X, s)
-
-            pred = self.y.predict_torch_proba(X) 
-            threshold = self.calc_threshold(pred)
-            p = self.define_psuedo_set(X,s, threshold)
-
+            # self.alpha = torch.as_tensor(len(p) / len(s),dtype=torch.float32) #update alpha based on the current pseudo-labels
 
             self.e.fit(X[p],s[p])
 
+
+            e_pred = torch.as_tensor(self.e.predict_proba(X)[:,1], dtype=torch.float32)
+
+            s_pred = e_pred.detach()*y_pred.detach()
+            
+            OR = self.OddsRatio(e_pred,s_pred)
+
+
             self.iter += 1
-            converge_treshold = 1
 
             if self.iter % 100 == 0:
                 print(f"Iteration {self.iter}")
@@ -77,84 +95,54 @@ class TwoModelLogReg(BaseLogReg):
                 self.validate(self.y,name="y(X)")
                 self.validate(self.e,name="e(X)",label_freq=True)
                 self.val_log.append(("threshold",threshold.detach().numpy(),0,0,0))
-                or_ = np.mean(self.OR(torch.as_tensor(X, dtype=torch.float32)).detach().numpy())
+                or_ = np.mean(self.OddsRatio(e=e_pred,s=s_pred).detach().numpy())
                 self.val_log.append(("OR",or_,0,0,0))
                 self.val_log.append(("size_p",np.sum(p.detach().numpy()),0,0,0))
 
+            if np.abs(loss-prev) < self.epsilon:
+                logging.info(f"Converged after {self.iter} iterations with loss {loss:.4f}")
+                break
+            prev = loss
+            
 
         elapsed = time.perf_counter() - start
         logging.info(f"TwoModelLogReg completed in {elapsed:.4f} seconds")
         return self
 
-    def define_psuedo_set(self, X, s, threshold):
+    def pseudo_indices(self, y_pred, s, threshold):
         """
         Define the pseudo-label set based on the current threshold.
         samples with predicted probabilities above the threshold are considered positive.
 
         return array of indices for possible positive samples
         """
-        p = torch.zeros(len(X), dtype=int)
-        for idx,instance in enumerate(zip(X, s)):
+        p = torch.zeros(len(s), dtype=int)
+        for idx,instance in enumerate(zip(y_pred, s)):
             if instance[1] == 1: #label
                 p[idx] = 1
             else:
-                if self.y.predict_torch_proba(instance[0]) > threshold: # 
+                if instance[0] > threshold: # 
                     p[idx] = 1
         
         p_indices = p > 0
         return p_indices
 
 
-    def calc_threshold(self,pred):
-        
-        threshold = torch.quantile(pred, self.alpha)
-    
-
-        return threshold
 
 
-    class S():
-        """
-        Non traditional clf, gives the probability that a given sample is labeled or not. 
-        
-        s(x) = e(x)*y(x)
-        s(x) = P(s= 1|x) = P(s = 1|,y = 1,x) * P(y=1|x)
-    
-        """
-        
-
-        def __init__(self, out, e, y):
-            self.out = out
-            self.e = e
-            self.y = y
-
-        def __call__(self,X):
-            if self.e.weights is None or self.y.weights is None:
-                # print("Model is not trained yet, make initial guess based navie pu log reg")
-                return self.s_naive(X)               
-            return self.e.predict_torch_proba(X)*self.y.predict_torch_proba(X)
-
-        def s_naive(self,X):
-            return self.out.naive_clf.predict_torch_label_proba(X)
 
 
-    class OddsRatio():
-        """
-        Estimates the odds ratio for a given sample.
-        Is the ratio between the odds of sample being unlabeled among the positives versus the odds of a sample being unlabeled among the the complete set of both positives and negatives.
+    #OddsRatio():
+    #     """
+    #     Estimates the odds ratio for a given sample.
+    #     Is the ratio between the odds of sample being unlabeled among the positives versus the odds of a sample being unlabeled among the the complete set of both positives and negatives.
 
-        """
-
-        def __init__(self,out, e,s):
-            self.e = e
-            self.s = s
-            self.out = out
-       
-        def __call__(self, X):
-            e = self.e.predict_torch_proba(X).clamp(1e-8, 1-1e-8)
-            s_hat = self.s(X).clamp(1e-8, 1-1e-8)
-            return ((1 - e) / e) * (s_hat / (1 - s_hat))
-
+    @staticmethod
+    def OddsRatio(e,s):
+        eps = 1e-8
+        e = e.detach().clamp(eps, 1-eps)
+        s = s.detach().clamp(eps, 1-eps)
+        return ((1 - e) / e) * (s / (1 - s))
 
 
     class Y(ClassicLogReg):
@@ -168,28 +156,27 @@ class TwoModelLogReg(BaseLogReg):
             self.out = out
 
         # Weight function unlabeled class
-        def w0(self,s,X):
-            return (1-s) +s*self.out.OR(X)
+        def w0(self,s,OR):
+            return (1-s) + s * OR
 
         #Weight function positive class
-        def w1(self,s,X):
-            return s+(1-s)*self.out.OR(X)
+        def w1(self,s,OR):
+            return s + (1-s)* OR
 
         # Loss is adjusted based on class of samples
-        def _weighted_loss(self,y_pred,X):
-            eps = 1e-15  # to avoid log(0), numerical stability, small constant
-            # ensure y_pred is in the range [eps, 1-eps]
-            #clamp_min y_pred to avoid log(0)
-
-            s_pred = self.out.s(X).clamp(eps, 1 - eps)  # clamp to avoid log(0)
-            W = self.w1(s_pred, X)* torch.log(y_pred) + self.w0(s_pred, X)* torch.log(1. - y_pred)
-            return -torch.mean(W)      
-        
+        def _weighted_loss(self,s,s_pred,OR):
+            eps = 1e-8
+            s_pred = s_pred.clamp(eps, 1 - eps)  # clamp to avoid log(0)
+            W = self.w1(s, OR)* torch.log(s_pred) + self.w0(s, OR)* torch.log(1. - s_pred)
+            return -torch.mean(W) # clamp to avoid log(0)
 
 
         #Adaptation of the classic logistic regression fit function with adam solver
         # Loss is now with weight adjustment
-        def fit(self, X, s):
+        def fit(self, X, s, OR):
+
+            # OR = OR.detach()
+            
             num_samples, n_features = X.shape
 
             self.weights = torch.zeros(n_features, device=CONFIG.TORCH_DEVICE, requires_grad=True)
@@ -203,11 +190,11 @@ class TwoModelLogReg(BaseLogReg):
 
             for _ in range(self.epochs):
                 linear_model = X @ self.weights + self.bias
-                y_predicted = self._activation(linear_model)
+                s_pred = self._activation(linear_model)
                 # if _ % 100 == 0:
                 #     print(f"Iteration {_}, Loss: {self._weighted_loss(s_t, y_predicted,X).item()}")
 
-                loss = self._weighted_loss(y_predicted,X)
+                loss = self._weighted_loss(s=s,s_pred=s_pred,OR=OR)
                 loss = penalty(self.penalty, loss, self.weights)
 
                 self.optimizer.zero_grad() # reset grads
@@ -216,46 +203,31 @@ class TwoModelLogReg(BaseLogReg):
 
                 self.loss_log[_] = loss.item() # log loss
 
-                if abs(prev_loss - loss.item()) < self.tolerance:
+                if abs(prev_loss - loss.item()) < self.tolerance or loss.item() < self.tolerance:
                     # print(f"Converged after {_} iterations")
                     break  
                 
                 prev_loss = loss.item()
-            return self
+            return loss.item()
 
-    class E(ClassicLogReg):
-        def __init__(self,out, learning_rate=0.001, epochs=100, tolerance=0.001, penalty="l2", solver='adam'):
-            super().__init__(learning_rate, epochs, tolerance, penalty, solver)
-            self.out = out
-        
-        #Adjusted prediction versus classic logreg
-        #
-        def predict_proba(self, X):
-            #Initial guess requried for algorithm
-            if self.weights is None:
-                # print("Model is not trained yet, make initial guess based navie pu log reg")
-                return 1/2*(self.out.s.s_naive(X).detach().numpy() + 1)
-            
-            linear_model = self.update_linear_model(X)
-            return self._activation(linear_model).detach().numpy()
-            #Polynomial estimate of e, see paper 
 
-        def predict_torch_proba(self, X_t):
-            if self.weights is None:
-                return 1/2*(self.out.s.s_naive(X_t) + 1)
-            return super().predict_torch_proba(X_t)
-        
-        def predict(self, X, threshold=0.5):
-            return super().predict(X, threshold)
     
-        # VALDIDATION ###########################################################
+    # VALDIDATION ###########################################################
 
 
     def validate(self,clf,name,label_freq=False):
         X_val, y_val, s_val = self.VAL
 
         if label_freq:
-            y_true = s_val
+            y_pred= clf.predict_proba(X_val)[:,1]
+            y_pred = torch.as_tensor(y_pred, dtype=torch.float32)
+            y_pred_positive = y_pred[s_val == 1] #predictions for positive samples
+            threshold = torch.quantile(y_pred_positive, self.alpha) #calculate threshold based on alpha quantile
+
+
+            p = self.pseudo_indices(y_pred,s_val, threshold)
+            y_true = s_val[p]
+            X_val = X_val[p]  #use pseudo-labels as true labels
         else:
             y_true = y_val
 

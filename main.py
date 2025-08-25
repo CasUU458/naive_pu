@@ -69,7 +69,7 @@ def experiment():
 
     # Fit the Sklearn Logistic Regression model as a baseline
 
-    TM_clf = TwoModelLogReg(epochs=CONFIG.EPOCHS, learning_rate=CONFIG.LEARNING_RATE,penalty=CONFIG.penalty,solver=CONFIG.solver,validation=VAL,alpha=CONFIG.TM_ALPHA)
+    TM_clf = TwoModelLogReg(epochs=CONFIG.EPOCHS, learning_rate=CONFIG.LEARNING_RATE,penalty=CONFIG.penalty,solver=CONFIG.solver,validation=VAL,alpha=CONFIG.c)
     TM_clf = do_classification(TM_clf, "Two Model Logistic Regression", X_train, y_train, X_test, y_test)
     # sk_clf = do_classification(SklearnLogisticRegression(penalty=None, max_iter=CONFIG.EPOCHS), "Sklearn Logistic Regression", X_train, y_train, X_test, y_test)
 
@@ -92,7 +92,7 @@ def evaluate(clf, naive_clf, TM_clf, X_test, y_test, log_path):
 
     plot_feature_weights(naive_clf, X_test.columns.to_numpy(),name=clf_names[1],path=log_path)
     plot_feature_weights(TM_clf._get_y_clf(), X_test.columns.to_numpy(),name=clf_names[2],path=log_path)
-    plot_feature_weights(TM_clf._get_e_clf(), X_test.columns.to_numpy(),name=f"{clf_names[2]} e(x)",path=log_path)
+    # plot_feature_weights(TM_clf._get_e_clf(), X_test.columns.to_numpy(),name=f"{clf_names[2]} e(x)",path=log_path)
     plot_validation(TM_clf,path=log_path)
     plt.show()
     return 0
