@@ -4,7 +4,7 @@ from sklearn.linear_model import LogisticRegression as SklearnLogisticRegression
 
 from config import CONFIG
 from data.metrics import plot_loss_curves, plot_probabilities, do_classification,plot_metric_bar,plot_feature_weights,plot_validation
-
+from data.datasets import load_diabetes
 matplotlib.use("TkAgg")
 import time
 
@@ -15,12 +15,19 @@ from data.datasets import prepare_and_split_data, get_pd_dataset
 import logging
 import os
 
+import sys
+sys.path.append("/Users/cas/Documents/putm")
+from putm import PUtm
+from sklearn.linear_model import LogisticRegression
+import json
+
 def experiment():
     t = time.time()
     print("Current time:", t)
 
     #import config settings from json file
     CONFIG.from_json("config.json")
+    CONFIG.set_random_seed(seed=42)  # set the random seed for reproducibility
 
     #check if logs directory exists, if not exist create it
     log_path = f"logs/{time.strftime('%Y-%m-%d %H-%M-%S')}"
@@ -65,7 +72,10 @@ def experiment():
     logging.info(f"Validation set shape: {VAL[0].shape, VAL[1].shape, VAL[2].shape}")
 
     # Fit the Classic Logistic Regression model
-    clf = do_classification(ClassicLogReg(epochs=CONFIG.EPOCHS, learning_rate=CONFIG.LEARNING_RATE,solver=CONFIG.solver,penalty=CONFIG.penalty), "Classic Logistic Regression", X_train, y_train, X_test, y_test)
+    clf_y = LogisticRegression(max_iter=CONFIG.EPOCHS,penalty=CONFIG.penalty)
+    clf_e = LogisticRegression(max_iter=CONFIG.EPOCHS,penalty=CONFIG.penalty)
+    clf = PUtm(clf_y,clf_e,epochs=CONFIG.EPOCHS)
+    clf = do_classification(clf, "Classic Logistic Regression", X_train, y_train, X_test, y_test)
 
     # Fit the Sklearn Logistic Regression model as a baseline
 
@@ -79,27 +89,36 @@ def experiment():
 
 def evaluate(clf, naive_clf, TM_clf, X_test, y_test, log_path):
 
-    plot_loss_curves(clf, naive_clf, c=CONFIG.c,path=log_path)
+    # plot_loss_curves(clf, naive_clf, c=CONFIG.c,path=log_path)
   
 
     clfs = [clf, naive_clf, TM_clf]
     clf_names = ["Classic Logistic Regression", "Naive Logistic Regression", "Two model logic Regression"]
-    plot_probabilities(clf, naive_clf, X_test, y_test,name_1=clf_names[0],name_2=clf_names[1],path=log_path)
-    plot_probabilities(clf, TM_clf, X_test, y_test,name_1=clf_names[0],name_2=clf_names[2],path=log_path)
+    # plot_probabilities(clf, naive_clf, X_test, y_test,name_1=clf_names[0],name_2=clf_names[1],path=log_path)
+    # plot_probabilities(clf, TM_clf, X_test, y_test,name_1=clf_names[0],name_2=clf_names[2],path=log_path)
 
     plot_metric_bar(clfs, X_test, y_test, clf_names=clf_names, path=log_path)
 
 
-    plot_feature_weights(naive_clf, X_test.columns.to_numpy(),name=clf_names[1],path=log_path)
-    plot_feature_weights(TM_clf._get_y_clf(), X_test.columns.to_numpy(),name=clf_names[2],path=log_path)
-    # plot_feature_weights(TM_clf._get_e_clf(), X_test.columns.to_numpy(),name=f"{clf_names[2]} e(x)",path=log_path)
-    plot_validation(TM_clf,path=log_path)
+    # plot_feature_weights(naive_clf, X_test.columns.to_numpy(),name=clf_names[1],path=log_path)
+    # plot_feature_weights(TM_clf._get_y_clf(), X_test.columns.to_numpy(),name=clf_names[2],path=log_path)
+    # # plot_feature_weights(TM_clf._get_e_clf(), X_test.columns.to_numpy(),name=f"{clf_names[2]} e(x)",path=log_path)
+    # plot_validation(TM_clf,path=log_path)
     plt.show()
     return 0
 
+
+
+
+        
+
+
+
 if __name__ == "__main__":
+
     clf,naive_clf, TM_clf,X_test, y_test, log_path = experiment()
     evaluate(clf,naive_clf, TM_clf,X_test, y_test, log_path)
+
     # CONFIG.from_json("config.json")
 
     # data = get_pd_dataset(name=CONFIG.DATASET_NAME)
@@ -133,3 +152,5 @@ if __name__ == "__main__":
 
     # clf = TwoModelLogReg()
     # clf = do_classification(clf, "Two Model Logistic Regression", X_train, y_train, X_test, y_test)
+ 
+  

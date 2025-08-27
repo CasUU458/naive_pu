@@ -8,7 +8,7 @@ import time
 import logging
 
 class ClassicLogReg(BaseLogReg):
-    def __init__(self, learning_rate=0.001, epochs=1000, tolerance=1e-6,penalty=None,solver='adam'):
+    def __init__(self, learning_rate=CONFIG.LEARNING_RATE, epochs=CONFIG.EPOCHS, tolerance=CONFIG.CONVERGENCE_TOLERANCE, penalty=CONFIG.penalty, solver=CONFIG.solver):
 
         super().__init__(learning_rate, epochs, tolerance, _sigmoid,penalty,solver)
 
@@ -67,7 +67,7 @@ class ClassicLogReg(BaseLogReg):
             if abs(prev_loss - loss.item()) < self.tolerance:
                 # print(f"Converged after {_} iterations")
                 break   
-
+            prev_loss = loss.item()
         return self
 
     def fit_lbfgs(self,X,y):

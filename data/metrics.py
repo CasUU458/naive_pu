@@ -37,7 +37,7 @@ def do_classification(classifier, name, X_train, y_train, X_test, y_test):
 #The true value and estimated value of c are also plotted
 def plot_loss_curves(classic_log_reg, naive_log_reg, c=None, path="logs"):
     plt.figure(figsize=(12, 6))
-    plt.plot(classic_log_reg.loss_log, label='Classic Log Reg Loss', color='blue', alpha=0.5)
+    # plt.plot(classic_log_reg.loss_log, label='Classic Log Reg Loss', color='blue', alpha=0.5)
     plt.plot(naive_log_reg.loss_log, label='Naive Log Reg Loss', color='orange', alpha=0.5)
     plt.plot(naive_log_reg.loss_c_log, label=r'Naive Log Reg $\hat{c}$ Loss', color='green', alpha=0.5)
     plt.plot(naive_log_reg.c_log, label=r"$\hat{c}$", color='red', alpha=0.8, linestyle='--')

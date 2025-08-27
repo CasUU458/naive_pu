@@ -1,7 +1,7 @@
 import torch 
 import numpy as np
 
-from classifiers.helpers import _sigmoid,penalty
+from classifiers.helpers import _sigmoid,penalty,_loss
 from classifiers.base_log_reg import BaseLogReg
 from classifiers.naive_log_reg import NaiveLogReg
 from classifiers.classic_log_reg import ClassicLogReg
@@ -10,10 +10,10 @@ from config import CONFIG
 import copy
 import time
 import logging
-from sklearn.linear_model import LogisticRegression
+# from sklearn.linear_model import LogisticRegression
 
 class TwoModelLogReg(BaseLogReg):
-    def __init__(self, learning_rate=0.001, epochs=300, tolerance=1e-6,penalty=None,solver='adam',alpha=None,epsilon=1e-8,validation=None):
+    def __init__(self, learning_rate=CONFIG.LEARNING_RATE, epochs=300, tolerance=CONFIG.CONVERGENCE_TOLERANCE, penalty=CONFIG.penalty, solver=CONFIG.solver, alpha=CONFIG.TM_ALPHA, epsilon=CONFIG.CONVERGENCE_TOLERANCE, validation=None):
 
         super().__init__(learning_rate, epochs, tolerance, _sigmoid,penalty,solver)
         self.naive_clf = NaiveLogReg(epochs=300,penalty="l2",solver="adam")
@@ -52,17 +52,15 @@ class TwoModelLogReg(BaseLogReg):
         e_pred = 1./2. * (s_pred + 1) #initial guess for e(x), see paper
         OR = self.OddsRatio(e_pred,s_pred)
 
-        self.e = LogisticRegression()
+        self.e =ClassicLogReg(learning_rate=self.learning_rate*0.5, epochs=600,penalty="l1",solver="adam")
         self.y = self.Y(out=self, learning_rate=self.learning_rate, epochs=self.epochs,penalty=self.penalty,solver=self.solver)
-        
-       
-   
+
 
         X = torch.as_tensor(X, dtype=torch.float32,device=CONFIG.TORCH_DEVICE)
         s = torch.as_tensor(s, dtype=torch.float32, device=CONFIG.TORCH_DEVICE)
-        prev = np.inf
+        prev = None
 
-        while self.iter < self.epochs*0.25:
+        while self.iter < self.epochs:
 
             loss = self.y.fit(X, s,OR)
 
@@ -78,8 +76,10 @@ class TwoModelLogReg(BaseLogReg):
 
             self.e.fit(X[p],s[p])
 
+            #sklearn:
+            # e_pred = torch.as_tensor(self.e.predict_proba(X)[:,1], dtype=torch.float32)
 
-            e_pred = torch.as_tensor(self.e.predict_proba(X)[:,1], dtype=torch.float32)
+            e_pred = self.e.predict_torch_proba(X)
 
             s_pred = e_pred.detach()*y_pred.detach()
             
@@ -98,12 +98,15 @@ class TwoModelLogReg(BaseLogReg):
                 or_ = np.mean(self.OddsRatio(e=e_pred,s=s_pred).detach().numpy())
                 self.val_log.append(("OR",or_,0,0,0))
                 self.val_log.append(("size_p",np.sum(p.detach().numpy()),0,0,0))
-
-            if np.abs(loss-prev) < self.epsilon:
-                logging.info(f"Converged after {self.iter} iterations with loss {loss:.4f}")
-                break
-            prev = loss
             
+
+
+            if ( prev is not None ) and  ( np.abs(loss - prev) < self.epsilon ):
+                logging.info(f"Converged after {self.iter} iterations with loss {loss:.4f}")
+                print(f"Converged after {self.iter} iterations with loss {loss:.4f}")
+                break
+
+            prev = loss
 
         elapsed = time.perf_counter() - start
         logging.info(f"TwoModelLogReg completed in {elapsed:.4f} seconds")
@@ -219,15 +222,9 @@ class TwoModelLogReg(BaseLogReg):
         X_val, y_val, s_val = self.VAL
 
         if label_freq:
-            y_pred= clf.predict_proba(X_val)[:,1]
-            y_pred = torch.as_tensor(y_pred, dtype=torch.float32)
-            y_pred_positive = y_pred[s_val == 1] #predictions for positive samples
-            threshold = torch.quantile(y_pred_positive, self.alpha) #calculate threshold based on alpha quantile
-
-
-            p = self.pseudo_indices(y_pred,s_val, threshold)
-            y_true = s_val[p]
-            X_val = X_val[p]  #use pseudo-labels as true labels
+            X_val = X_val[y_val == 1]
+            s_val = s_val[y_val == 1]
+            y_true = s_val
         else:
             y_true = y_val
 

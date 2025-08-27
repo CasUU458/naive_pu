@@ -10,7 +10,7 @@ import logging
 
 
 class NaiveLogReg(BaseLogReg):
-    def __init__(self, learning_rate=0.001, epochs=1000, tolerance=1e-6, c_estimate=None, learning_rate_c=None,penalty=None,solver='adam'):
+    def __init__(self, learning_rate=CONFIG.LEARNING_RATE, epochs=CONFIG.EPOCHS, tolerance=CONFIG.CONVERGENCE_TOLERANCE, c_estimate=CONFIG.INITIAL_GUESS_C, learning_rate_c=CONFIG.LEARNING_RATE_C, penalty=CONFIG.penalty, solver=CONFIG.solver,random_state=CONFIG.SEED):
 
         super().__init__(learning_rate, epochs, tolerance, _modified_pu_sigmoid,penalty,solver)
 
@@ -19,7 +19,8 @@ class NaiveLogReg(BaseLogReg):
         if c_estimate is not None:
             self.c_estimate = c_estimate
         else:
-            rng = np.random.default_rng(seed=CONFIG.SEED)
+
+            rng = np.random.default_rng(seed=random_state)
             self.c_estimate = rng.uniform(0.1, 0.9)  # Randomly initialize c_estimate between 0.1 and 0.9
 
         if learning_rate_c is not None:
@@ -204,10 +205,10 @@ class NaiveLogReg(BaseLogReg):
     s(x) = p(s=1|x)
     s(x) = probaility that a instance is labeled
     """
-    def predict_label_proba(self, X, threshold=0.5):
+    def predict_label_proba(self, X):
         linear_model = self.update_linear_model(X)
         return self._activation(linear_model, self.b).detach().numpy()
         
-    def predict_torch_label_proba(self, X, threshold=0.5):
-        linear_model = self.update_linear_model(X)
+    def predict_torch_label_proba(self,X_t):
+        linear_model = self.update_linear_model(X_t)
         return self._activation(linear_model, self.b)
