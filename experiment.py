@@ -23,6 +23,7 @@ from sklearn.exceptions import ConvergenceWarning
 import json
 import warnings
 warnings.filterwarnings("ignore")  # suppress all warnings
+from datetime import datetime
 
 
 
@@ -35,12 +36,16 @@ global RESULT_COLS #Columns for the result dataframe
 global EXPERIMENT_VALUES #Values to use for the current experiment
 global EXPERIMENT_ATTR  #Attribute to vary for the current experiment, must equal one of the CONFIG attributes
 
+#2 var experiment_attr_2
+global EXPERIMENT_ATTR_2
+global EXPERIMENT_VALUES_2
+
 os.makedirs("EXPERIMENTS", exist_ok=True)
 
 def set_global_vars():
     global DATASETS
     DATASETS = ["mock","diabetes","breastcancer","mnist"]
-
+    
     global MODELS
     MODELS = {
     "classic": ClassicLogReg(),
@@ -156,13 +161,55 @@ def experiment():
     result.to_pickle(os.path.join(exp_path, "final.pkl"))
     return result
 
+def double_experiment():
+    path = "EXPERIMENTS"
+    exp_path = os.path.join(path, f"{EXPERIMENT_ATTR}_{EXPERIMENT_ATTR_2}")
+    os.makedirs(exp_path, exist_ok=True)
+    result = make_test_result_df(sets=[EXPERIMENT_VALUES,EXPERIMENT_VALUES_2,DATASETS, ITERS, MODELS], columns=[EXPERIMENT_ATTR,EXPERIMENT_ATTR_2,"dataset","iter","model"])
+    result.to_pickle(os.path.join(exp_path, "init.pkl"))
+    
+    for exp in EXPERIMENT_VALUES:
+        CONFIG.set_attr(EXPERIMENT_ATTR, exp)
+
+        for exp2 in EXPERIMENT_VALUES_2:
+            CONFIG.set_attr(EXPERIMENT_ATTR_2, exp2)
+
+            for i in ITERS:
+                seed = int((i+1234)*1234)
+                CONFIG.set_random_seed(seed)
+                print(f"{i} {EXPERIMENT_ATTR}: {exp}, SEED: {seed}")
+                
+                for dataset in DATASETS:
+                    data = get_pd_dataset(name=dataset)
+                    X_train,s_train,X_test,y_test = prepare_and_split_data(data)
+            
+                    for name,clf in MODELS.items():
+                        try:
+                            clf.fit(X_train,s_train)
+                            y_pred = clf.predict(X_test)
+                            res = evaluate_step(y_test,y_pred)
+                            mask =(
+                                (result[EXPERIMENT_ATTR] == exp) &
+                                (result["dataset"] == dataset) &
+                                (result["iter"] == i) &
+                                (result["model"] == name)
+                            )
+                            result.loc[mask,res.index] = res.values
+                            result.to_pickle(os.path.join(exp_path, f"{exp}_{exp2}_{dataset}_{name}_{i}.pkl"))
+                        except Exception as e:
+                            print(f"Error occurred for {name} on {dataset}: {e}")
+    result.to_pickle(os.path.join(exp_path, "final.pkl"))
+    return result
+
+
 
 
 if __name__ == "__main__":
 
     reset_config()
     set_global_vars()
-    
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+
     print("\n -- LABEL FREQUENCY -- \n")
     try:
         EXPERIMENT_VALUES = np.arange(0.1,1.1,0.1)
@@ -173,6 +220,7 @@ if __name__ == "__main__":
 
     reset_config()
     set_global_vars()
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
     print("\n -- LABEL MECHANISM -- \n")
     try:
@@ -186,6 +234,7 @@ if __name__ == "__main__":
     
     reset_config()
     set_global_vars()
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
     print("\n -- LABEL DISTRIBUTION -- \n")
 
@@ -199,6 +248,8 @@ if __name__ == "__main__":
 
     reset_config()
     set_global_vars()
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+
     
     print("\n -- LABEL MECHANISM CASECONTROL -- \n")
     try:
@@ -208,5 +259,19 @@ if __name__ == "__main__":
         experiment()
     except():
         print('Case control failed')
+
     reset_config()
     set_global_vars()
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+
+    print("\n -- SAR and LABEL DISTRIBUTION -- \n")
+    try:
+        CONFIG.c  = 0.2
+        EXPERIMENT_VALUES=["SCAR_1_1","SAR_1_1","SAR_1_5","SAR_1_10","SAR_1_100","SAR_4_5","SAR_4_3","SAR_10_5"]
+        EXPERIMENT_ATTR = "LABELING_MECHANISM"
+        EXPERIMENT_VALUES_2= np.arange(0.1,0.55,0.05)
+        EXPERIMENT_ATTR_2 = "LABEL_DISTRIBUTION"
+        double_experiment()
+    except:
+        print("Error occurred during SAR and label distribution experiment")
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
