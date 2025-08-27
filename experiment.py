@@ -274,4 +274,35 @@ if __name__ == "__main__":
         double_experiment()
     except:
         print("Error occurred during SAR and label distribution experiment")
+
+
+    reset_config()
+    set_global_vars()
     print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+
+    print("\n -- SAR and c -- \n")
+    try:
+        EXPERIMENT_VALUES=["SCAR_1_1","SAR_1_1","SAR_1_5","SAR_1_10","SAR_1_100","SAR_4_5","SAR_4_3","SAR_10_5"]
+        EXPERIMENT_ATTR = "LABELING_MECHANISM"
+        EXPERIMENT_VALUES_2=np.arange(0.1,1.1,0.1)
+        EXPERIMENT_ATTR_2 = "c"
+        double_experiment()
+    except:
+        print("Error occurred during SAR and c  experiment")
+
+    reset_config()
+    set_global_vars()
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+
+    print("\n -- label distribution and c -- \n")
+    try:
+        EXPERIMENT_VALUES= np.arange(0.1,0.55,0.05)
+        EXPERIMENT_ATTR = "LABELING_DISTRIBUTION"
+        EXPERIMENT_VALUES_2=np.arange(0.1,1.1,0.1)
+        EXPERIMENT_ATTR_2 = "c"
+        double_experiment()
+    except:
+        print("Error occurred during c and label distribution experiment")
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+
+    
