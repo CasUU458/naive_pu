@@ -29,14 +29,25 @@ def get_pd_dataset(name = CONFIG.DATASET_NAME):
 
 
 def prepare_and_split_data(data,
-                            test_size=CONFIG.TEST_SIZE,
-                            c=CONFIG.c,
-                            labeling_mechanism=CONFIG.LABELING_MECHANISM,
-                            label_distribution=CONFIG.LABEL_DISTRIBUTION,
-                            scale_data=CONFIG.SCALE_DATA,
-                            validation_frac=CONFIG.VALIDATION_FRAC,
-                            random_seed=CONFIG.SEED,
+                            test_size=None,
+                            c=None,
+                            labeling_mechanism=None,
+                            label_distribution=None,
+                            scale_data=None,
+                            validation_frac=None,
+                            random_seed=None,
                             as_numpy=True):
+    
+    #### load config
+    test_size = test_size if test_size is not None else CONFIG.TEST_SIZE
+    c = c if c is not None else CONFIG.c
+    labeling_mechanism = labeling_mechanism if labeling_mechanism is not None else CONFIG.LABELING_MECHANISM
+    label_distribution = label_distribution if label_distribution is not None else CONFIG.LABEL_DISTRIBUTION
+    scale_data = scale_data if scale_data is not None else CONFIG.SCALE_DATA
+    validation_frac = validation_frac if validation_frac is not None else CONFIG.VALIDATION_FRAC
+    random_seed = random_seed if random_seed is not None else CONFIG.SEED
+
+    test_size = float(test_size)
 
     assert isinstance(data, pd.DataFrame), "Data must be a pandas DataFrame"
     assert 'target' in data.columns, "Data must contain a 'target' column"
