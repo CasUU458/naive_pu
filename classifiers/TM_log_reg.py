@@ -7,26 +7,75 @@ from classifiers.naive_log_reg import NaiveLogReg
 from classifiers.classic_log_reg import ClassicLogReg
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from config import CONFIG
-import copy
 import time
 import logging
 # from sklearn.linear_model import LogisticRegression
 
-class TwoModelLogReg(BaseLogReg):
-    def __init__(self, learning_rate=CONFIG.LEARNING_RATE, epochs=300, tolerance=CONFIG.CONVERGENCE_TOLERANCE, penalty=CONFIG.penalty, solver=CONFIG.solver, alpha=CONFIG.TM_ALPHA, epsilon=CONFIG.CONVERGENCE_TOLERANCE, validation=None):
+class TwoModelLogReg():
+    def __init__(self,max_loop_iterations=None, epsilon=None, alpha=None,y_clf_args=None,e_clf_args=None, validation=None,verbose=1):
 
-        super().__init__(learning_rate, epochs, tolerance, _sigmoid,penalty,solver)
-        self.naive_clf = NaiveLogReg(epochs=300,penalty="l2",solver="adam")
+        self.max_loop_iterations = max_loop_iterations
+        self.epsilon = epsilon
+        self.alpha = alpha
+        self.y_clf_args = y_clf_args
+        self.e_clf_args = e_clf_args
+        self.init()
+
         self.e = None
         self.y = None
         self.s = None
         self.OR = None
         self.iter = 0 #iteration counter
-        self.alpha = alpha #alpha is the quantile for the threshold 
-        self.epsilon = epsilon
+     
         self.val_log = []  
         self.VAL = [validation[0],validation[1],validation[2]] if validation is not None else None # validation set: X_val, y_val, s_val
-   
+        
+        self.verbose = verbose
+        # super().__init__(lr=lr, max_iterations=max_iterations, tolerance=tolerance, _activation=_sigmoid, penalty=penalty, solver=solver)
+    
+    def init(self):
+        
+        if self.max_loop_iterations is None:    
+            self.max_loop_iterations = CONFIG.max_loop_iterations #Max outerloop iters
+        if self.epsilon is None:
+            self.epsilon = CONFIG.epsilon
+        if self.alpha is None:
+            self.alpha = CONFIG.alpha
+
+
+    def init_e(self,clf_args=None):
+        if clf_args is not None:
+            assert type(clf_args) == dict, "e_clf_args must be a dictionary"
+            
+            if clf_args.get("clf") is not None:
+                return clf_args.get("clf")
+        else:
+            clf_args = {}   
+
+        lr = clf_args.get("lr") if clf_args.get("lr") is not None else CONFIG.lr
+        max_iterations = clf_args.get("max_iterations") if clf_args.get("max_iterations") is not None else CONFIG.max_iterations
+        tolerance = clf_args.get("tolerance") if clf_args.get("tolerance") is not None else CONFIG.tolerance
+        penalty = clf_args.get("penalty") if clf_args.get("penalty") is not None else CONFIG.penalty
+        solver = clf_args.get("solver") if clf_args.get("solver") is not None else CONFIG.solver
+        return ClassicLogReg(lr=lr, max_iterations=max_iterations, tolerance=tolerance, penalty=penalty, solver=solver)
+
+    def init_y(self,clf_args=None):
+        if clf_args is not None:
+            assert type(clf_args) == dict, "e_clf_args must be a dictionary"
+        else:
+            clf_args = {}
+
+        if clf_args.get("clf") is not None:
+            return clf_args.get("clf")
+
+        lr = clf_args.get("lr") if clf_args.get("lr") is not None else CONFIG.lr
+        max_iterations = clf_args.get("max_iterations") if clf_args.get("max_iterations") is not None else CONFIG.max_iterations
+        tolerance = clf_args.get("tolerance") if clf_args.get("tolerance") is not None else CONFIG.tolerance
+        penalty = clf_args.get("penalty") if clf_args.get("penalty") is not None else CONFIG.penalty
+        solver = clf_args.get("solver") if clf_args.get("solver") is not None else CONFIG.solver
+        return self.Y(self,lr=lr, max_iterations=max_iterations, tolerance=tolerance, penalty=penalty, solver=solver)
+
+
     def fit(self,X,s):
         
         """
@@ -36,31 +85,35 @@ class TwoModelLogReg(BaseLogReg):
     
 
 
-
+        print("Starting TM fit...") if self.verbose == 1 else None
         #initialize 
         start = time.perf_counter()
         self.iter = 0
         # Fit (and validate) the naive classifier
-        self.naive_clf.fit(X, s)
+        naive_clf = NaiveLogReg(max_iterations=300,penalty="l2",solver="adam")
+        naive_clf.fit(X, s)
+
         if self.VAL is not None:
-            self.validate(self.naive_clf,name="y(X)")
+            self.validate(naive_clf,name="y(X)")
 
         if self.alpha is None:
-            self.alpha = self.naive_clf.get_c_hat() #get the c_hat from the naive classifier
-        s_pred = self.naive_clf.predict_torch_label_proba(X)
+            self.alpha = naive_clf.get_c_hat() #get the c_hat from the naive classifier
+
+        s_pred = naive_clf.predict_torch_label_proba(X)
          #get the probabilities of the naive classifier
         e_pred = 1./2. * (s_pred + 1) #initial guess for e(x), see paper
         OR = self.OddsRatio(e_pred,s_pred)
 
-        self.e =ClassicLogReg(learning_rate=self.learning_rate*0.5, epochs=600,penalty="l1",solver="adam")
-        self.y = self.Y(out=self, learning_rate=self.learning_rate, epochs=self.epochs,penalty=self.penalty,solver=self.solver)
+        # self.e =ClassicLogReg(lr=self.lr, max_iterations=self.max_iterations, tolerance=self.tolerance, penalty=self.penalty, solver=self.solver)
+        self.e = self.init_e(self.e_clf_args)
+        self.y = self.init_y(self.y_clf_args)
 
 
-        X = torch.as_tensor(X, dtype=torch.float32,device=CONFIG.TORCH_DEVICE)
-        s = torch.as_tensor(s, dtype=torch.float32, device=CONFIG.TORCH_DEVICE)
-        prev = None
+        X = torch.as_tensor(X, dtype=torch.float32,device=CONFIG.device)
+        s = torch.as_tensor(s, dtype=torch.float32, device=CONFIG.device)
+        prev = 0
 
-        while self.iter < self.epochs:
+        while self.iter < self.max_loop_iterations:
 
             loss = self.y.fit(X, s,OR)
 
@@ -88,8 +141,8 @@ class TwoModelLogReg(BaseLogReg):
 
             self.iter += 1
 
-            if self.iter % 100 == 0:
-                print(f"Iteration {self.iter}")
+            # if self.iter % 100 == 0:
+            #     print(f"Iteration {self.iter}")
 
             if self.VAL is not None:
                 self.validate(self.y,name="y(X)")
@@ -101,15 +154,17 @@ class TwoModelLogReg(BaseLogReg):
             
 
 
-            if ( prev is not None ) and  ( np.abs(loss - prev) < self.epsilon ):
-                logging.info(f"Converged after {self.iter} iterations with loss {loss:.4f}")
-                print(f"Converged after {self.iter} iterations with loss {loss:.4f}")
+            if  np.abs(loss - prev) < self.epsilon:
+                logging.info(f"TM Converged after {self.iter} iterations with loss {loss:.4f}")
+                print(f"TM Converged after {self.iter} iterations with loss {loss:.4f}") if self.verbose == 1 else None
                 break
 
             prev = loss
 
         elapsed = time.perf_counter() - start
-        logging.info(f"TwoModelLogReg completed in {elapsed:.4f} seconds")
+        logging.info(f"TwoModelLogReg fitted in {elapsed:.4f} seconds ")
+        print(f"TwoModelLogReg fitted in {elapsed:.4f} seconds ") if self.verbose == 1 else None
+
         return self
 
     def pseudo_indices(self, y_pred, s, threshold):
@@ -142,7 +197,7 @@ class TwoModelLogReg(BaseLogReg):
 
     @staticmethod
     def OddsRatio(e,s):
-        eps = 1e-8
+        eps = 1e-7
         e = e.detach().clamp(eps, 1-eps)
         s = s.detach().clamp(eps, 1-eps)
         return ((1 - e) / e) * (s / (1 - s))
@@ -154,8 +209,11 @@ class TwoModelLogReg(BaseLogReg):
         Weights are based on the odds ratio 
         """
 
-        def __init__(self,out, learning_rate=0.001, epochs=100, tolerance=0.001, penalty="l2", solver='lbfgs'):
-            super().__init__(learning_rate, epochs, tolerance, penalty, solver)
+
+
+
+        def __init__(self,out, lr=None, max_iterations=None, tolerance=None, penalty=None, solver=None):
+            super().__init__(lr, max_iterations, tolerance, penalty, solver)
             self.out = out
 
         # Weight function unlabeled class
@@ -168,7 +226,7 @@ class TwoModelLogReg(BaseLogReg):
 
         # Loss is adjusted based on class of samples
         def _weighted_loss(self,s,s_pred,OR):
-            eps = 1e-8
+            eps = 1e-7
             s_pred = s_pred.clamp(eps, 1 - eps)  # clamp to avoid log(0)
             W = self.w1(s, OR)* torch.log(s_pred) + self.w0(s, OR)* torch.log(1. - s_pred)
             return -torch.mean(W) # clamp to avoid log(0)
@@ -182,16 +240,16 @@ class TwoModelLogReg(BaseLogReg):
             
             num_samples, n_features = X.shape
 
-            self.weights = torch.zeros(n_features, device=CONFIG.TORCH_DEVICE, requires_grad=True)
-            self.bias = torch.zeros(1, device=CONFIG.TORCH_DEVICE, requires_grad=True)
+            self.weights = torch.zeros(n_features, device=CONFIG.device, requires_grad=True)
+            self.bias = torch.zeros(1, device=CONFIG.device, requires_grad=True)
 
-            self.optimizer = torch.optim.Adam([self.weights, self.bias], lr=self.learning_rate)
+            self.optimizer = torch.optim.Adam([self.weights, self.bias], lr=self.lr)
             
             prev_loss = float('inf')
 
-            self.loss_log = np.zeros(self.epochs)
+            self.loss_log = np.zeros(self.max_iterations)
 
-            for _ in range(self.epochs):
+            for _ in range(self.max_iterations):
                 linear_model = X @ self.weights + self.bias
                 s_pred = self._activation(linear_model)
                 # if _ % 100 == 0:
@@ -206,7 +264,7 @@ class TwoModelLogReg(BaseLogReg):
 
                 self.loss_log[_] = loss.item() # log loss
 
-                if abs(prev_loss - loss.item()) < self.tolerance or loss.item() < self.tolerance:
+                if abs(prev_loss - loss.item()) < self.tolerance:
                     # print(f"Converged after {_} iterations")
                     break  
                 

@@ -4,7 +4,6 @@ from sklearn.cluster import KMeans
 import numpy as np
 import pandas as pd
 from config import CONFIG
-from numpy import random as rng
 
 def reorder_dataframe_with_target_at_end(df):
     df_cols = df.columns.tolist()
@@ -14,10 +13,14 @@ def reorder_dataframe_with_target_at_end(df):
     return df[df_cols]
 
 
-def set_positive_label_distribution(label_distribution, positives, negatives, random_state=CONFIG.SEED):
+def set_positive_label_distribution(label_distribution, positives, negatives, random_state=None):
     # label_distribution = how balanced or imbalanced the labels should be.
     # this is used to replicate the distribution of the original experiment on another datasets.
     # always keep the size of test_negatives, and downsample the size of test_positives
+
+    # set random_state if not provided
+    if random_state is None:
+        random_state = CONFIG.random_state
 
     test_negatives_size = negatives.shape[0]
 
@@ -47,7 +50,11 @@ def normalize_data_minmax_scalar(train, test):
     return train, test
 
 
-def SCAR(df, c,random_state=CONFIG.SEED):
+def SCAR(df, c,random_state=None):
+
+    if random_state is None:
+        random_state = CONFIG.random_state
+
     df["PU"] = df.loc[df['target'] == 1, 'target'].sample(frac=c, random_state=random_state)
     df["PU"] = df["PU"].fillna(0)
     df["PU"] = df["PU"].astype(int)
@@ -55,7 +62,11 @@ def SCAR(df, c,random_state=CONFIG.SEED):
     return df.reset_index(drop=True)
 
 
-def SAR(df, c,n_features=1,strength=10,random_state=CONFIG.SEED):
+def SAR(df, c,n_features=1,strength=10,random_state=None):
+    
+    if random_state is None:
+        random_state = CONFIG.random_state
+
     # P(s =1 "| X")
     rng = np.random.default_rng(random_state)
 
@@ -68,25 +79,21 @@ def SAR(df, c,n_features=1,strength=10,random_state=CONFIG.SEED):
 
 
     if n_features == 1:
-        features = df.select_dtypes(include=[np.number]).drop(columns=["target"]).sample(n=1, axis=1, random_state=random_state).columns.tolist()
-        CONFIG.dominant_features = features
-        feature = features[0]
-        values = df.loc[df["target"]>0,feature].astype(float).to_numpy()
-        #boolean choice to go reverse importance
-        # if np.random.rand() < 0.5:
-        #     idx = idx[::-1]
-        # values = (values - values.min()) / (values.max() - values.min())  # normalize to [0,1]
-        n_values = len(values)
-        modifier = np.ones(n_values)
-        modifier *=strength
-        modifier /= np.sqrt(len(values))
-        probs = 1./(1+np.exp(-(np.transpose(values) * modifier)))
-        probs = pd.Series(probs,index=df.loc[df["target"]>0].index)
-        probs = probs.clip(lower=1e-20, upper=1-1e-20)
+        feature = str(rng.choice(df.drop(columns="target").select_dtypes(include=[np.number]).columns.to_list()))
+        # features = df.select_dtypes(include=[np.number]).drop(columns=["target"]).sample(n=1, axis=1, random_state=random_state).columns.tolist()
+        CONFIG.dominant_features = feature
+        feature = feature
+        values = df[feature].values
+        n_samples = len(values)
+        weight = np.ones(n_samples)
+        weight *=strength
+        weight /= np.sqrt(len(values))
+        probs = 1./(1+np.exp(-(np.transpose(values) * weight))) #sigmoid, modifier
         
-        
- 
-    
+        # positive_indices = df.loc[df["target"]>0,"target"].index
+        # probs = pd.Series(probs[positive_indices.values],index=positive_indices)
+        # probs = probs.clip(lower=1e-7, upper=1-(1e-7))
+
     else:
         
 
@@ -114,11 +121,11 @@ def SAR(df, c,n_features=1,strength=10,random_state=CONFIG.SEED):
             output *= (p_low**(1-Xe[:,i]) * p_high**(Xe[:,i])) 
 
         probs = output**(1/n_features)
-        probs = probs[df.loc[df["target"]>0].index]
-        probs = pd.Series(probs,index=df.loc[df["target"]>0].index)
+        # probs = probs[df.loc[df["target"]>0].index]
+        # probs = pd.Series(probs,index=df.loc[df["target"]>0].index)
 
 
-    requested_n = int(len(probs) * c)
+    # requested_n = int(len(probs) * c)
     # idx = probs.index.to_numpy()
 
     # if requested_n < len(probs):
@@ -128,9 +135,11 @@ def SAR(df, c,n_features=1,strength=10,random_state=CONFIG.SEED):
     #     raise ValueError("Error: requested label_distribution is larger than the number of positives.")
     
     df["PU"] = 0
-    sampled_idx = df.loc[df["target"]>0].sample(n=requested_n,weights=probs, random_state=random_state).index
+    # sampled_idx = df.loc[df["target"]>0].sample(n=requested_n,weights=probs, random_state=random_state).index
+    sampled_idx = np.where(probs>0.8)[0]
     df.loc[sampled_idx, "PU"] = 1
-
+    df.loc[df["target"]==0,"PU"] = 0    
+    
     # simple
     # feature = df.select_dtypes(include=[np.number]).drop(columns=["target"]).sample(n=1, axis=1, random_state=CONFIG.SEED).columns.tolist()
     # CONFIG.dominant_features = feature
@@ -145,8 +154,10 @@ def SAR(df, c,n_features=1,strength=10,random_state=CONFIG.SEED):
 
 
 
-def case_control(df, c,drop_feature=0,strength=10,random_state=CONFIG.SEED):
-    
+def case_control(df, c,drop_feature=0,strength=10,random_state=None):
+    if random_state is None:
+        random_state = CONFIG.random_state
+
     rng = np.random.default_rng(random_state)
 
     feature = df.select_dtypes(include=[np.number]).drop(columns=["target"]).columns[drop_feature]

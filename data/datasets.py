@@ -12,7 +12,7 @@ import tarfile
 import numpy as np
 
 
-def get_pd_dataset(name = CONFIG.DATASET_NAME):
+def get_pd_dataset(name = None):
     mnist_name = name.lower()
     name = mnist_name.split("_")[0]
     match name:
@@ -31,21 +31,21 @@ def get_pd_dataset(name = CONFIG.DATASET_NAME):
 def prepare_and_split_data(data,
                             test_size=None,
                             c=None,
-                            labeling_mechanism=None,
-                            label_distribution=None,
-                            scale_data=None,
+                            label_mechanism=None,
+                            positive_ratio=None,
+                            scaler=None,
                             validation_frac=None,
-                            random_seed=None,
+                            random_state=None,
                             as_numpy=True):
     
     #### load config
-    test_size = test_size if test_size is not None else CONFIG.TEST_SIZE
+    test_size = test_size if test_size is not None else CONFIG.test_size
     c = c if c is not None else CONFIG.c
-    labeling_mechanism = labeling_mechanism if labeling_mechanism is not None else CONFIG.LABELING_MECHANISM
-    label_distribution = label_distribution if label_distribution is not None else CONFIG.LABEL_DISTRIBUTION
-    scale_data = scale_data if scale_data is not None else CONFIG.SCALE_DATA
-    validation_frac = validation_frac if validation_frac is not None else CONFIG.VALIDATION_FRAC
-    random_seed = random_seed if random_seed is not None else CONFIG.SEED
+    label_mechanism = label_mechanism if label_mechanism is not None else CONFIG.label_mechanism
+    positive_ratio = positive_ratio if positive_ratio is not None else CONFIG.positive_ratio
+    scaler = scaler if scaler is not None else CONFIG.scaler
+    validation_frac = validation_frac if validation_frac is not None else CONFIG.validation_frac
+    random_state = random_state if random_state is not None else CONFIG.random_state
 
     test_size = float(test_size)
 
@@ -57,15 +57,15 @@ def prepare_and_split_data(data,
     CONFIG.true_prior_proba = data['target'].sum() / len(data)
 
     # ensure both labels are included in the test set by taking a fraction according to test_size of each label
-    test_positives = data[data['target'] == 1].sample(frac=test_size, random_state=random_seed)
-    test_negatives = data[data['target'] == 0].sample(frac=test_size, random_state=random_seed)
+    test_positives = data[data['target'] == 1].sample(frac=test_size, random_state=random_state)
+    test_negatives = data[data['target'] == 0].sample(frac=test_size, random_state=random_state)
 
     # assert test_negatives.shape[0] + test_positives.shape[0] == int(test_size * len(data)), f"Test set size does not match expected size {test_negatives.shape[0] + test_positives.shape[0]} vs {int(test_size * len(data))}"
 
-    if label_distribution is not None:
-        test_positives = set_positive_label_distribution(label_distribution, test_positives, test_negatives, random_state=random_seed)
+    if positive_ratio is not None:
+        test_positives = set_positive_label_distribution(positive_ratio, test_positives, test_negatives, random_state=random_state)
 
-    test = pd.concat([test_positives, test_negatives]).sample(frac=1, random_state=random_seed)
+    test = pd.concat([test_positives, test_negatives]).sample(frac=1, random_state=random_state)
     train = data.drop(test.index)
 
     train = train.reset_index(drop=True)
@@ -74,12 +74,12 @@ def prepare_and_split_data(data,
     train_positives = train[train['target'] == 1]
     train_negatives = train[train['target'] == 0]
 
-    if label_distribution is not None:
-        train_positives = set_positive_label_distribution(label_distribution, train_positives, train_negatives,random_state=random_seed)
+    if positive_ratio is not None:
+        train_positives = set_positive_label_distribution(positive_ratio, train_positives, train_negatives,random_state=random_state)
 
-    train = pd.concat([train_positives, train_negatives]).sample(frac=1, random_state=random_seed)
+    train = pd.concat([train_positives, train_negatives]).sample(frac=1, random_state=random_state)
 
-    match scale_data:
+    match scaler:
         case "standard":
             train, test = normalize_data_standard_scalar(train, test)
         case "minmax":
@@ -89,30 +89,30 @@ def prepare_and_split_data(data,
         case _:
             warnings.warn("Error: no scalar method specified")
 
-    labeling_mechanism = labeling_mechanism.split("_")
-    n_features = int(labeling_mechanism[1]) if len(labeling_mechanism) > 1 else 1
-    strength = int(labeling_mechanism[2]) if len(labeling_mechanism) > 2 else 10
-    labeling_mechanism = labeling_mechanism[0]
-    match labeling_mechanism:
+    label_mechanism = label_mechanism.split("_")
+    n_features = int(label_mechanism[1]) if len(label_mechanism) > 1 else 1
+    strength = int(label_mechanism[2]) if len(label_mechanism) > 2 else 10
+    label_mechanism = label_mechanism[0]
+    match label_mechanism:
 
         case "SCAR":
             # c = p(s = 1 |y = 1) - thus, the probability that a positive label is labeled
             # following c, a fraction of the positive labels are unlabeled here (set to 0)
-            train = SCAR(train, c,random_state=random_seed)
-            test = SCAR(test, c,random_state=random_seed)
+            train = SCAR(train, c,random_state=random_state)
+            test = SCAR(test, c,random_state=random_state)
         case "SAR":
-            train = SAR(train, c,n_features=n_features,strength=strength,random_state=random_seed)
-            test = SAR(test, c,n_features=n_features,strength=strength,random_state=random_seed)
+            train = SAR(train, c,n_features=n_features,strength=strength,random_state=random_state)
+            test = SAR(test, c,n_features=n_features,strength=strength,random_state=random_state)
         case "casecontrol":
-            drop_feature = np.random.default_rng(seed=random_seed).choice(train.shape[1]-1)
-            train = case_control(train, c=c,drop_feature=drop_feature, strength=strength, random_state=random_seed)
-            test = case_control(test,   c=c,drop_feature=drop_feature, strength=strength, random_state=random_seed)
+            drop_feature = np.random.default_rng(seed=random_state).choice(train.shape[1]-1)
+            train = case_control(train, c=c,drop_feature=drop_feature, strength=strength, random_state=random_state)
+            test = case_control(test,   c=c,drop_feature=drop_feature, strength=strength, random_state=random_state)
         case _:
             raise ValueError("Error: specify correct scalar method")
 
     # train labels are the PU labels, test labels are the true labels
     if validation_frac is not None:
-        validation = train.sample(frac=validation_frac, random_state=random_seed)
+        validation = train.sample(frac=validation_frac, random_state=random_state)
         train = train.drop(validation.index)
         X_validation = validation.drop(columns=['target', 'PU'])
         s_validation = validation['PU']
@@ -144,7 +144,8 @@ def prepare_and_split_data(data,
     return X_train, y_train, X_test, y_test
 
 
-def mock_dataset(random_state=CONFIG.SEED):
+def mock_dataset():
+    random_state = CONFIG.random_state  
     n_positives = 65
     n_negatives = int(n_positives*1/(1/(50)))
     data = make_classification(n_samples=2*n_negatives, n_features=4, n_informative=4, n_redundant=0, random_state=random_state)

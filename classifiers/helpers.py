@@ -4,7 +4,7 @@ import torch
 
 def _loss (y_true, y_pred):
 
-    eps = 1e-15  # to avoid log(0), numerical stability, small constant
+    eps = 1e-7  # to avoid log(0), numerical stability, small constant
     # ensure y_pred is in the range [eps, 1-eps]
     #clamp_min y_pred to avoid log(0)
 
@@ -13,6 +13,8 @@ def _loss (y_true, y_pred):
     term1 = y_true* torch.log(y_pred)
     term2 = (1. - y_true) * torch.log(1. - y_pred)
     loss = -torch.mean(term1 + term2)
+    if loss.isnan():
+        raise ValueError("Loss is NaN, something went wrong with the computation.")
     return loss
 
 def penalty(type,loss,weights):

@@ -20,13 +20,14 @@ sys.path.append("/Users/cas/Documents/putm")
 from putm import PUtm
 from sklearn.linear_model import LogisticRegression
 import json
+import warnings
+warnings.filterwarnings("ignore")  # suppress all warnings
 
 def experiment():
     t = time.time()
     print("Current time:", t)
 
     #import config settings from json file
-    CONFIG.from_json("config.json")
     CONFIG.set_random_seed(seed=42)  # set the random seed for reproducibility
 
     #check if logs directory exists, if not exist create it
@@ -40,7 +41,7 @@ def experiment():
     logging.basicConfig(level=logging.INFO,
                         format='%'
                         '(asctime)s - %(levelname)s - %(message)s',datefmt='%Y-%m-%d %H:%M:%S',
-                        filename= f"{log_path}/{CONFIG.DATASET_NAME} {CONFIG.LABELING_MECHANISM} {CONFIG.c}.log",
+                        filename= f"{log_path}/{CONFIG.dataset} {CONFIG.label_mechanism} {CONFIG.c}.log",
                         filemode='w'
                         )
 
@@ -50,16 +51,15 @@ def experiment():
 
 
     #load the dataset
-    data = get_pd_dataset(name=CONFIG.DATASET_NAME)
+    data = get_pd_dataset(name=CONFIG.dataset)
 
     #preprocess and split the dataset into train an test data
     X_train, y_train, X_test, y_test,VAL = prepare_and_split_data(data = data,
-                                                            test_size=CONFIG.TEST_SIZE,
+                                                            test_size=CONFIG.test_size,
                                                             c=CONFIG.c,
-                                                            labeling_mechanism=CONFIG.LABELING_MECHANISM,
-                                                            train_label_distribution=CONFIG.TRAIN_LABEL_DISTRIBUTION,
-                                                            test_label_distribution=CONFIG.TEST_LABEL_DISTRIBUTION,
-                                                            scale_data=CONFIG.SCALE_DATA,validation_frac=CONFIG.VALIDATION_FRAC)
+                                                            label_mechanism=CONFIG.label_mechanism,
+                                                            positive_ratio=CONFIG.positive_ratio,
+                                                            scaler=CONFIG.scaler,validation_frac=0.2,as_numpy=False)
 
     print("Data loaded in {:.2f} seconds".format(time.time() - t))
     print("Train set shape:", X_train.shape, y_train.shape)
@@ -72,38 +72,36 @@ def experiment():
     logging.info(f"Validation set shape: {VAL[0].shape, VAL[1].shape, VAL[2].shape}")
 
     # Fit the Classic Logistic Regression model
-    clf_y = LogisticRegression(max_iter=CONFIG.EPOCHS,penalty=CONFIG.penalty)
-    clf_e = LogisticRegression(max_iter=CONFIG.EPOCHS,penalty=CONFIG.penalty)
-    clf = PUtm(clf_y,clf_e,epochs=CONFIG.EPOCHS)
+    clf = ClassicLogReg()
     clf = do_classification(clf, "Classic Logistic Regression", X_train, y_train, X_test, y_test)
 
     # Fit the Sklearn Logistic Regression model as a baseline
 
-    TM_clf = TwoModelLogReg(epochs=CONFIG.EPOCHS, learning_rate=CONFIG.LEARNING_RATE,penalty=CONFIG.penalty,solver=CONFIG.solver,validation=VAL,alpha=CONFIG.c)
+    TM_clf = TwoModelLogReg(validation=VAL)
     TM_clf = do_classification(TM_clf, "Two Model Logistic Regression", X_train, y_train, X_test, y_test)
-    # sk_clf = do_classification(SklearnLogisticRegression(penalty=None, max_iter=CONFIG.EPOCHS), "Sklearn Logistic Regression", X_train, y_train, X_test, y_test)
-
+    # sk_clf = do_classification(SklearnLogisticRegression(penalty=None, max_iter=CONFIG. max_iterations), "Sklearn Logistic Regression", X_train, y_train, X_test, y_test)
+    # TM_clf = None
     # Fit the Naive Logistic Regression model as a baseline
-    naive_clf = do_classification(NaiveLogReg(epochs=CONFIG.EPOCHS, learning_rate=CONFIG.LEARNING_RATE,learning_rate_c=CONFIG.LEARNING_RATE_C,c_estimate=CONFIG.INITIAL_GUESS_C,solver=CONFIG.solver,penalty=CONFIG.penalty), "Naive Logistic Regression", X_train, y_train, X_test, y_test)
+    naive_clf = do_classification(NaiveLogReg(), "Naive Logistic Regression", X_train, y_train, X_test, y_test)
     return clf,naive_clf, TM_clf,X_test, y_test, log_path
 
 def evaluate(clf, naive_clf, TM_clf, X_test, y_test, log_path):
 
-    # plot_loss_curves(clf, naive_clf, c=CONFIG.c,path=log_path)
+    plot_loss_curves(clf, naive_clf, c=CONFIG.c,path=log_path)
   
 
     clfs = [clf, naive_clf, TM_clf]
     clf_names = ["Classic Logistic Regression", "Naive Logistic Regression", "Two model logic Regression"]
-    # plot_probabilities(clf, naive_clf, X_test, y_test,name_1=clf_names[0],name_2=clf_names[1],path=log_path)
+    plot_probabilities(clf, naive_clf, X_test, y_test,name_1=clf_names[0],name_2=clf_names[1],path=log_path)
     # plot_probabilities(clf, TM_clf, X_test, y_test,name_1=clf_names[0],name_2=clf_names[2],path=log_path)
 
     plot_metric_bar(clfs, X_test, y_test, clf_names=clf_names, path=log_path)
 
 
-    # plot_feature_weights(naive_clf, X_test.columns.to_numpy(),name=clf_names[1],path=log_path)
-    # plot_feature_weights(TM_clf._get_y_clf(), X_test.columns.to_numpy(),name=clf_names[2],path=log_path)
-    # # plot_feature_weights(TM_clf._get_e_clf(), X_test.columns.to_numpy(),name=f"{clf_names[2]} e(x)",path=log_path)
-    # plot_validation(TM_clf,path=log_path)
+    plot_feature_weights(naive_clf, X_test.columns.to_numpy(),name=clf_names[1],path=log_path)
+    plot_feature_weights(TM_clf._get_y_clf(), X_test.columns.to_numpy(),name=clf_names[2],path=log_path)
+    plot_feature_weights(TM_clf._get_e_clf(), X_test.columns.to_numpy(),name=f"{clf_names[2]} e(x)",path=log_path)
+    plot_validation(TM_clf,path=log_path)
     plt.show()
     return 0
 
@@ -121,11 +119,11 @@ if __name__ == "__main__":
 
     # CONFIG.from_json("config.json")
 
-    # data = get_pd_dataset(name=CONFIG.DATASET_NAME)
+    # data = get_pd_dataset(name=CONFIG.dataset)
 
     # #preprocess and split the dataset into train an test data
     # X_train, y_train, X_test, y_test,VAL = prepare_and_split_data(data = data,
-    #                                                         test_size=CONFIG.TEST_SIZE,
+    #                                                         test_size=CONFIG.test_size,
     #                                                         c=CONFIG.c,
     #                                                         labeling_mechanism="SAR_4",
     #                                                         train_label_distribution=CONFIG.TRAIN_LABEL_DISTRIBUTION,
@@ -136,11 +134,11 @@ if __name__ == "__main__":
 
 
 
-    # data = get_pd_dataset(name=CONFIG.DATASET_NAME)
+    # data = get_pd_dataset(name=CONFIG.dataset)
 
     # #preprocess and split the dataset into train an test data
     # X_train, y_train, X_test, y_test = prepare_and_split_data(data = data,
-    #                                                         test_size=CONFIG.TEST_SIZE,
+    #                                                         test_size=CONFIG.test_size,
     #                                                         c=CONFIG.c,
     #                                                         labeling_mechanism=CONFIG.LABELING_MECHANISM,
     #                                                         train_label_distribution=CONFIG.TRAIN_LABEL_DISTRIBUTION,

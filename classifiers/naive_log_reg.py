@@ -10,32 +10,70 @@ import logging
 
 
 class NaiveLogReg(BaseLogReg):
-    def __init__(self, learning_rate=CONFIG.LEARNING_RATE, epochs=CONFIG.EPOCHS, tolerance=CONFIG.CONVERGENCE_TOLERANCE, c_estimate=CONFIG.INITIAL_GUESS_C, learning_rate_c=CONFIG.LEARNING_RATE_C, penalty=CONFIG.penalty, solver=CONFIG.solver,random_state=CONFIG.SEED):
-
-        super().__init__(learning_rate, epochs, tolerance, _modified_pu_sigmoid,penalty,solver)
+    def __init__(self,max_iterations=None, lr=None,lr_c=None, tolerance=None, c_estimate=None, penalty=None, solver=None,random_state=None):
+        
 
         self.optimizer_b = None
-
-        if c_estimate is not None:
-            self.c_estimate = c_estimate
-        else:
-
-            rng = np.random.default_rng(seed=random_state)
-            self.c_estimate = rng.uniform(0.1, 0.9)  # Randomly initialize c_estimate between 0.1 and 0.9
-
-        if learning_rate_c is not None:
-            self.learning_rate_c = learning_rate_c
-        else:
-            # Set learning rate for c based on epochs, as suggest in paper
-            self.learning_rate_c = 1 / epochs
-
-        self.b = None # b parameter as surrogate for c
-        self.b_init = c2b(self.c_estimate)
-
+        self.b = None #b parameter surrogate for c in modified sigmoid function
         self.c_log = None
         self.loss_c_log = None
-    
 
+        self.lr = lr
+        self.lr_c = lr_c
+        self.max_iterations = max_iterations
+        self.tolerance = tolerance
+        self.c_estimate = c_estimate
+        self.penalty = penalty
+        self.solver = solver
+        self.random_state = random_state
+        self.init() #use value from config if provided parameter value is none
+        super().__init__(lr=self.lr, max_iterations=self.max_iterations, tolerance=self.tolerance, _activation=_modified_pu_sigmoid, penalty=self.penalty, solver=self.solver)
+
+
+       
+
+        
+        
+        
+        
+        
+        
+        
+
+
+        
+    def init(self):
+        """
+        Imports values from the config file if parameters values are not provided by user
+        """
+
+
+        if self.c_estimate is None:
+            self.b_init = None
+        else:
+            self.b_init = c2b(self.c_estimate)
+
+        if self.lr is None:
+            self.lr = CONFIG.lr
+
+        if self.lr_c is None:
+            self.lr_c = CONFIG.lr_c
+
+        if self.max_iterations is None:
+            self.max_iterations = CONFIG.max_iterations
+
+        if self.tolerance is None:
+            self.tolerance = CONFIG.tolerance
+
+        if self.penalty is None:
+            self.penalty = CONFIG.penalty
+
+        if self.solver is None:
+            self.solver = CONFIG.solver
+
+        if self.random_state is None:
+            self.random_state = CONFIG.random_state
+        return 0
 
     def fit(self, X, y):
         """
@@ -47,6 +85,10 @@ class NaiveLogReg(BaseLogReg):
 
         """
     
+        if self.b_init is None:
+            self.b_init = c2b(np.random.default_rng(CONFIG.random_state).uniform(0.2, 0.8)) # avoid b being None if c init is None
+
+
         start = time.perf_counter()
         if str(self.solver).lower() != 'lbfgs':
             result =  self.fit_adam(X,y)
@@ -61,21 +103,22 @@ class NaiveLogReg(BaseLogReg):
     def fit_adam(self, X, y):
         num_samples, n_features = X.shape
 
-        self.weights = torch.zeros(n_features, device=CONFIG.TORCH_DEVICE, requires_grad=True)
-        self.bias = torch.zeros(1, device=CONFIG.TORCH_DEVICE, requires_grad=True)
 
-        X_t = torch.as_tensor(X, dtype=torch.float32, device=CONFIG.TORCH_DEVICE)
-        y_t = torch.as_tensor(y, dtype=torch.float32, device=CONFIG.TORCH_DEVICE)
+        self.weights = torch.zeros(n_features, device=CONFIG.device, requires_grad=True)
+        self.bias = torch.zeros(1, device=CONFIG.device, requires_grad=True)
 
-        self.optimizer = torch.optim.Adam([self.weights, self.bias], lr=self.learning_rate)
+        X_t = torch.as_tensor(X, dtype=torch.float32, device=CONFIG.device)
+        y_t = torch.as_tensor(y, dtype=torch.float32, device=CONFIG.device)
 
-        self.b = torch.tensor(self.b_init, device=CONFIG.TORCH_DEVICE, requires_grad=True)
-        self.optimizer_b = torch.optim.Adam([self.b], lr=self.learning_rate_c)
+        self.optimizer = torch.optim.Adam([self.weights, self.bias], lr=self.lr)
+
+        self.b = torch.nn.Parameter(torch.tensor(0.5, device=CONFIG.device, requires_grad=True))
+        self.optimizer_b = torch.optim.Adam([self.b], lr=self.lr_c)
 
         prev_loss = float('inf')
-        self.loss_log, self.loss_c_log, self.c_log = np.zeros(self.epochs), np.zeros(self.epochs), np.zeros(self.epochs)
+        self.loss_log, self.loss_c_log, self.c_log = np.zeros(self.max_iterations), np.zeros(self.max_iterations), np.zeros(self.max_iterations)
 
-        for _ in range(self.epochs):
+        for _ in range(self.max_iterations):
             linear_model = X_t @ self.weights + self.bias
             y_predicted = self._activation(linear_model, self.b)
 
@@ -93,16 +136,17 @@ class NaiveLogReg(BaseLogReg):
             y_predicted = self._activation(linear_model, self.b)
 
             loss_b = _loss(y_t, y_predicted)
+            
             self.optimizer_b.zero_grad() # reset grads
             loss_b.backward() # calculate grads
             self.optimizer_b.step() # update b
 
             self.loss_c_log[_] = loss_b.item()
-            self.c_log[_] = b2c(self.b.detach().numpy())
+            self.c_log[_] = b2c(self.b.item())
 
             if _ % 1000 == 0:
                 print(
-                    f"Iteration {_}, Loss: {_loss(y_t, y_predicted).item()} Loss b: {loss_b.item()}, c: {b2c(self.b.detach().cpu().numpy())}")
+                    f"Iteration {_}, Loss: {_loss(y_t, y_predicted).item()} Loss b: {loss_b.item()}, c: {b2c(self.b.item())}")
 
             if abs(prev_loss - loss.item()) < self.tolerance:
                 print(f"Converged after {_} iterations")
@@ -114,22 +158,22 @@ class NaiveLogReg(BaseLogReg):
     def fit_lbfgs(self, X, y):
             num_samples, n_features = X.shape
 
-            self.weights = torch.zeros(n_features, device=CONFIG.TORCH_DEVICE, requires_grad=True)
-            self.bias = torch.zeros(1, device=CONFIG.TORCH_DEVICE, requires_grad=True)
+            self.weights = torch.zeros(n_features, device=CONFIG.device, requires_grad=True)
+            self.bias = torch.zeros(1, device=CONFIG.device, requires_grad=True)
 
-            X_t = torch.as_tensor(X, dtype=torch.float32, device=CONFIG.TORCH_DEVICE)
-            y_t = torch.as_tensor(y, dtype=torch.float32, device=CONFIG.TORCH_DEVICE)
+            X_t = torch.as_tensor(X, dtype=torch.float32, device=CONFIG.device)
+            y_t = torch.as_tensor(y, dtype=torch.float32, device=CONFIG.device)
 
-            self.optimizer = torch.optim.LBFGS([self.weights, self.bias], lr=self.learning_rate)
+            self.optimizer = torch.optim.LBFGS([self.weights, self.bias], lr=self.lr)
 
-            self.b = torch.tensor(self.b_init, device=CONFIG.TORCH_DEVICE, requires_grad=True)
-            self.optimizer_b = torch.optim.LBFGS([self.b], lr=self.learning_rate_c)
+            self.b = torch.nn.Parameter(torch.tensor(float(self.b_init), dtype=torch.float32, device=CONFIG.device))
+            self.optimizer_b = torch.optim.LBFGS([self.b], lr=self.lr_c)
 
             prev_loss = float('inf')
-            self.loss_log, self.loss_c_log, self.c_log = np.zeros(self.epochs), np.zeros(self.epochs), np.zeros(self.epochs)
+            self.loss_log, self.loss_c_log, self.c_log = np.zeros(self.max_iterations), np.zeros(self.max_iterations), np.zeros(self.max_iterations)
 
             
-            for _ in range(self.epochs):
+            for _ in range(self.max_iterations):
                 def closure():
                     self.optimizer.zero_grad()
                     linear_model = X_t @ self.weights + self.bias
@@ -163,10 +207,10 @@ class NaiveLogReg(BaseLogReg):
 
                 self.loss_log[_] = loss.item()
                 self.loss_c_log[_] = loss_b.item()
-                self.c_log[_] = b2c(self.b.detach().cpu().numpy())
+                self.c_log[_] = b2c(self.b.item())
 
                 if _ % 100 == 0:
-                    print(f"Iteration {_}, Loss: {loss.item()}, Loss b: {loss_b.item()}, c: {b2c(self.b.detach().cpu().numpy())}")
+                    print(f"Iteration {_}, Loss: {loss.item()}, Loss b: {loss_b.item()}, c: {b2c(self.b.item())}")
 
                 if abs(prev_loss - loss.item()) < self.tolerance:
                     print(f"Converged after {_} iterations")

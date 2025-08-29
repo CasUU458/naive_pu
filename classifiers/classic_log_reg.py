@@ -8,10 +8,30 @@ import time
 import logging
 
 class ClassicLogReg(BaseLogReg):
-    def __init__(self, learning_rate=CONFIG.LEARNING_RATE, epochs=CONFIG.EPOCHS, tolerance=CONFIG.CONVERGENCE_TOLERANCE, penalty=CONFIG.penalty, solver=CONFIG.solver):
+    def __init__(self,lr=None, max_iterations=None, tolerance=None, penalty=None, solver=None):
 
-        super().__init__(learning_rate, epochs, tolerance, _sigmoid,penalty,solver)
+        super().__init__(lr, max_iterations, tolerance, _sigmoid,penalty,solver)
+        self.init()
 
+    def init(self):
+        """
+        If a hyperparameter is not provided, use the default from the config.
+        """
+
+        if self.lr is None:
+            self.lr = CONFIG.lr
+        if self.max_iterations is None:
+            self.max_iterations = CONFIG.max_iterations
+        if self.tolerance is None:
+            self.tolerance = CONFIG.tolerance
+        if self.penalty is None:
+            self.penalty = CONFIG.penalty
+        if self.solver is None:
+            self.solver = CONFIG.solver
+
+        #Set random seed for reproducibility
+        torch.manual_seed(CONFIG.random_state)
+        np.random.seed(CONFIG.random_state)
 
     def fit(self,X,y):
         """
@@ -37,19 +57,19 @@ class ClassicLogReg(BaseLogReg):
     def fit_adam(self, X, y):
         num_samples, n_features = X.shape
 
-        self.weights = torch.zeros(n_features, device=CONFIG.TORCH_DEVICE, requires_grad=True)
-        self.bias = torch.zeros(1, device=CONFIG.TORCH_DEVICE, requires_grad=True)
+        self.weights = torch.zeros(n_features, device=CONFIG.device, requires_grad=True)
+        self.bias = torch.zeros(1, device=CONFIG.device, requires_grad=True)
 
-        X_t = torch.as_tensor(X, dtype=torch.float32,device=CONFIG.TORCH_DEVICE)
-        y_t = torch.as_tensor(y, dtype=torch.float32, device=CONFIG.TORCH_DEVICE)
+        X_t = torch.as_tensor(X, dtype=torch.float32,device=CONFIG.device)
+        y_t = torch.as_tensor(y, dtype=torch.float32, device=CONFIG.device)
 
-        self.optimizer = torch.optim.Adam([self.weights, self.bias], lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam([self.weights, self.bias],lr=self.lr)
         
         prev_loss = float('inf')
 
-        self.loss_log = np.zeros(self.epochs)
+        self.loss_log = np.zeros(self.max_iterations)
 
-        for _ in range(self.epochs):
+        for _ in range(self.max_iterations):
             linear_model = X_t @ self.weights + self.bias
             y_predicted = self._activation(linear_model)
             # if _ % 100 == 0:
@@ -65,27 +85,29 @@ class ClassicLogReg(BaseLogReg):
             self.loss_log[_] = loss.item() # log loss
 
             if abs(prev_loss - loss.item()) < self.tolerance:
-                # print(f"Converged after {_} iterations")
+                print(f"Converged after {_} iterations")
                 break   
             prev_loss = loss.item()
+
+        print(f"ClassicLogReg training complete, {_} iterations")
         return self
 
     def fit_lbfgs(self,X,y):
         num_samples, n_features = X.shape
 
-        self.weights = torch.zeros(n_features, device=CONFIG.TORCH_DEVICE, requires_grad=True)
-        self.bias = torch.zeros(1, device=CONFIG.TORCH_DEVICE, requires_grad=True)
+        self.weights = torch.zeros(n_features, device=CONFIG.device, requires_grad=True)
+        self.bias = torch.zeros(1, device=CONFIG.device, requires_grad=True)
 
-        X_t = torch.as_tensor(X, dtype=torch.float32,device=CONFIG.TORCH_DEVICE)
-        y_t = torch.as_tensor(y, dtype=torch.float32, device=CONFIG.TORCH_DEVICE)
+        X_t = torch.as_tensor(X, dtype=torch.float32,device=CONFIG.device)
+        y_t = torch.as_tensor(y, dtype=torch.float32, device=CONFIG.device)
 
-        self.optimizer = torch.optim.LBFGS([self.weights, self.bias], lr=self.learning_rate)
+        self.optimizer = torch.optim.LBFGS([self.weights, self.bias],lr=self.lr)
 
         prev_loss = float('inf')
 
-        self.loss_log = np.zeros(self.epochs)
+        self.loss_log = np.zeros(self.max_iterations)
 
-        for _ in range(self.epochs):
+        for _ in range(self.max_iterations):
             def closure():
                 self.optimizer.zero_grad()
                 linear_model = X_t @ self.weights + self.bias
@@ -112,7 +134,7 @@ class ClassicLogReg(BaseLogReg):
                 # print(f"Iteration {_}, Loss: {loss.item()}")
 
             if abs(prev_loss - loss.item()) < self.tolerance:
-                print(f"Converged after {_} iterations")
+                print(f"\n \n Converged after {_} iterations")
                 break   
 
             prev_loss = loss.item()

@@ -37,7 +37,7 @@ def do_classification(classifier, name, X_train, y_train, X_test, y_test):
 #The true value and estimated value of c are also plotted
 def plot_loss_curves(classic_log_reg, naive_log_reg, c=None, path="logs"):
     plt.figure(figsize=(12, 6))
-    # plt.plot(classic_log_reg.loss_log, label='Classic Log Reg Loss', color='blue', alpha=0.5)
+    plt.plot(classic_log_reg.loss_log, label='Classic Log Reg Loss', color='blue', alpha=0.5)
     plt.plot(naive_log_reg.loss_log, label='Naive Log Reg Loss', color='orange', alpha=0.5)
     plt.plot(naive_log_reg.loss_c_log, label=r'Naive Log Reg $\hat{c}$ Loss', color='green', alpha=0.5)
     plt.plot(naive_log_reg.c_log, label=r"$\hat{c}$", color='red', alpha=0.8, linestyle='--')
@@ -48,7 +48,7 @@ def plot_loss_curves(classic_log_reg, naive_log_reg, c=None, path="logs"):
     plt.ylabel('Loss')
     plt.legend()
     plt.grid()
-    plt.savefig(os.path.join(path,f"loss_curves_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}_{time.strftime('%Y-%m-%d_%H-%M-%S')}.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(path,f"loss_curves_{CONFIG.dataset}_{CONFIG.label_mechanism}_{CONFIG.c}_{time.strftime('%Y-%m-%d_%H-%M-%S')}.png"), bbox_inches='tight')
 
 # Plot predicted probabilities for each of the instances in the test set
 # Shows whether the model is correct in its predictions
@@ -85,7 +85,7 @@ def plot_probabilities(clf, naive_clf, X_test, y_test,name_1="Classic",name_2="N
     plt.grid()
     plt.tight_layout()
     plt.xticks([])
-    plt.savefig(os.path.join(path,f"probabilities_{name_1}_{name_2}_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}_{time.strftime('%Y-%m-%d_%H-%M-%S')}.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(path,f"probabilities_{name_1}_{name_2}_{CONFIG.dataset}_{CONFIG.label_mechanism}_{CONFIG.c}_{time.strftime('%Y-%m-%d_%H-%M-%S')}.png"), bbox_inches='tight')
 
 
 def plot_metric_bar(classifiers, X_test, y_test, clf_names=None, path="logs"):
@@ -133,7 +133,7 @@ def plot_metric_bar(classifiers, X_test, y_test, clf_names=None, path="logs"):
     plt.savefig(
         os.path.join(
             path,
-            f"metrics_comparison_{'_'.join(clf_names)}_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"
+            f"metrics_comparison_{'_'.join(clf_names)}_{CONFIG.dataset}_{CONFIG.label_mechanism}_{CONFIG.c}.png"
         ),
         bbox_inches='tight'
     )
@@ -171,7 +171,7 @@ def plot_feature_weights(clf,feature_names,top_n=None,name="clf",path="logs"):
     plt.xlabel('Feature Importance')
     plt.title(f'Feature Importance from Logistic Regression - {name}')
     plt.tight_layout()
-    plt.savefig(os.path.join(path,f"feature_weights_{name}_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(path,f"feature_weights_{name}_{CONFIG.dataset}_{CONFIG.label_mechanism}_{CONFIG.c}.png"), bbox_inches='tight')
 
 
 def plot_validation(clf,path="logs"):
@@ -195,13 +195,13 @@ def plot_validation(clf,path="logs"):
     plt.plot(index,y["recall"], label="Recall", linestyle="--",alpha=0.7)
     plt.plot(index,y["f1"], label="F1-Score", linestyle="-",alpha=0.7,lw=2)
     plt.legend()
-    plt.title(f"Validation Metrics for y(X) - {CONFIG.DATASET_NAME}")
+    plt.title(f"Validation Metrics for y(X) - {CONFIG.dataset}")
     plt.tight_layout()
     plt.xlabel("epoch")
     plt.ylabel("Score")
     plt.ylim(0,1.1)
     plt.yticks(np.arange(0, 1.1, 0.1))
-    plt.savefig(os.path.join(path,f"validation_metrics_y(X)_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(path,f"validation_metrics_y(X)_{CONFIG.dataset}_{CONFIG.label_mechanism}_{CONFIG.c}.png"), bbox_inches='tight')
 
     # e(x)
     plt.figure(figsize=(10, 6))
@@ -211,39 +211,39 @@ def plot_validation(clf,path="logs"):
     plt.plot(index,e["recall"], label="Recall", linestyle="--",alpha=0.7)
     plt.plot(index,e["f1"], label="F1-Score", linestyle="-",alpha=0.7,lw=2)
     plt.legend()
-    plt.title(f"Validation Metrics for e(X) - {CONFIG.DATASET_NAME}")
+    plt.title(f"Validation Metrics for e(X) - {CONFIG.dataset}")
     plt.tight_layout()
     plt.xlabel("epoch")
     plt.ylabel("Score")
     plt.ylim(0,1.1)
     plt.yticks(np.arange(0, 1.1, 0.1))
 
-    plt.savefig(os.path.join(path,f"validation_metrics_e(X)_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(path,f"validation_metrics_e(X)_{CONFIG.dataset}_{CONFIG.label_mechanism}_{CONFIG.c}.png"), bbox_inches='tight')
 
     plt.figure(figsize=(10, 6))
     index = threshold.index
     plt.plot(index,threshold, label="Threshold", linestyle="-",alpha=0.7)
     plt.legend()
-    plt.title(f"TM Threshold - {CONFIG.DATASET_NAME}")
+    plt.title(f"TM Threshold - {CONFIG.dataset}")
     plt.xlabel("epoch")
     plt.ylabel("Value")
-    plt.savefig(os.path.join(path,f"TM_threshold_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(path,f"TM_threshold_{CONFIG.dataset}_{CONFIG.label_mechanism}_{CONFIG.c}.png"), bbox_inches='tight')
 
     plt.figure(figsize=(10, 6))
     index = or_.index
     plt.plot(index, or_, label="OR", linestyle="-",alpha=0.7)
     plt.legend()
-    plt.title(f"TM OR - {CONFIG.DATASET_NAME}")
+    plt.title(f"TM OR - {CONFIG.dataset}")
     plt.xlabel("epoch")
     plt.ylabel("Value")
-    plt.savefig(os.path.join(path,f"TM_OR_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(path,f"TM_OR_{CONFIG.dataset}_{CONFIG.label_mechanism}_{CONFIG.c}.png"), bbox_inches='tight')
 
     plt.figure(figsize=(10, 6))
     index = size_p.index
     plt.plot(index, size_p, label="Size of P", linestyle="-",alpha=0.7)
     plt.legend()
-    plt.title(f"TM Size of P - {CONFIG.DATASET_NAME}")
+    plt.title(f"TM Size of P - {CONFIG.dataset}")
     plt.xlabel("epoch")
     plt.ylabel("Value")
-    plt.savefig(os.path.join(path,f"TM_size_p_{CONFIG.DATASET_NAME}_{CONFIG.LABELING_MECHANISM}_{CONFIG.c}.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(path,f"TM_size_p_{CONFIG.dataset}_{CONFIG.label_mechanism}_{CONFIG.c}.png"), bbox_inches='tight')
 
