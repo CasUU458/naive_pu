@@ -1,4 +1,3 @@
-from kiwisolver import strength
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.cluster import KMeans
 import numpy as np
