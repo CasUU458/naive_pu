@@ -4,6 +4,7 @@ from sklearn.cluster import KMeans
 import numpy as np
 import pandas as pd
 from config import CONFIG
+import matplotlib.pyplot as plt
 
 def reorder_dataframe_with_target_at_end(df):
     df_cols = df.columns.tolist()
@@ -81,7 +82,7 @@ def SAR(df, c,n_features=1,strength=10,random_state=None):
     if n_features == 1:
         feature = str(rng.choice(df.drop(columns="target").select_dtypes(include=[np.number]).columns.to_list()))
         # features = df.select_dtypes(include=[np.number]).drop(columns=["target"]).sample(n=1, axis=1, random_state=random_state).columns.tolist()
-        CONFIG.dominant_features = feature
+        CONFIG.dominant_features = [feature]
         feature = feature
         values = df[feature].values
         n_samples = len(values)
@@ -89,7 +90,6 @@ def SAR(df, c,n_features=1,strength=10,random_state=None):
         weight *=strength
         weight /= np.sqrt(len(values))
         probs = 1./(1+np.exp(-(np.transpose(values) * weight))) #sigmoid, modifier
-        
         # positive_indices = df.loc[df["target"]>0,"target"].index
         # probs = pd.Series(probs[positive_indices.values],index=positive_indices)
         # probs = probs.clip(lower=1e-7, upper=1-(1e-7))
@@ -135,11 +135,17 @@ def SAR(df, c,n_features=1,strength=10,random_state=None):
     #     raise ValueError("Error: requested label_distribution is larger than the number of positives.")
     
     df["PU"] = 0
-    # sampled_idx = df.loc[df["target"]>0].sample(n=requested_n,weights=probs, random_state=random_state).index
-    sampled_idx = np.where(probs>0.8)[0]
-    df.loc[sampled_idx, "PU"] = 1
-    df.loc[df["target"]==0,"PU"] = 0    
-    
+    idx = np.where(probs>0.8)[0] #Label all samples with prob > 0.8 as positive
+    df = df.reset_index(drop=True)
+    df.loc[idx, "PU"] = 1
+    df.loc[df["target"]==0,"PU"] = 0 
+    # df["PU"] = 0
+    # df = df.reset_index(drop=True)
+    # df.loc[df["PU"].sample(frac=c, weights=probs, random_state=random_state).index, "PU"] = 1 #Label positive samples according to probs
+    # df.loc[df["target"]==0,"PU"] = 0
+    CONFIG.SAR_c_log = np.round(df['PU'].sum()/df['target'].sum(),3)
+    print(f"\n \n SAR: {CONFIG.SAR_c_log} of positive labels were selected, total = {df['PU'].sum()} \n \n")
+
     # simple
     # feature = df.select_dtypes(include=[np.number]).drop(columns=["target"]).sample(n=1, axis=1, random_state=CONFIG.SEED).columns.tolist()
     # CONFIG.dominant_features = feature
@@ -149,6 +155,22 @@ def SAR(df, c,n_features=1,strength=10,random_state=None):
     # df["PU"] = 0
     # df.loc[df_pos_ix, "PU"] = 1
     # df["PU"] = df["PU"].astype(int)
+    if n_features == 1:
+        plt.figure()
+        df_sorted = df[["PU",CONFIG.dominant_features[0]]].reset_index(drop=True)
+        df_sorted["probs"] = probs
+        df_sorted = df_sorted.sort_values(by=CONFIG.dominant_features[0], ascending=False)
+        df_sorted["color"] = "C0"
+        df_sorted.loc[df_sorted["PU"]==1,"color"] = "C1"
+        plt.scatter(df_sorted.loc[df_sorted["PU"]==0,CONFIG.dominant_features[0]],df_sorted.loc[df_sorted["PU"]==0,"probs"], c="C0",label="Unlabeled", alpha=0.3,marker="x")
+
+        plt.scatter(df_sorted.loc[df_sorted["PU"]==1,CONFIG.dominant_features[0]],df_sorted.loc[df_sorted["PU"]==1,"probs"], c="C1",label="Positive")
+        plt.xlabel(f"{CONFIG.dominant_features[0]} feature value")
+        plt.ylabel("Label probability")
+        plt.title(f"SAR total positive labels: {df['PU'].sum()}, c: {CONFIG.SAR_c_log}")
+        plt.legend()
+        plt.savefig(f"SAR_feature_importance_{strength}.png")
+
 
     return df.reset_index(drop=True)
 
@@ -161,25 +183,24 @@ def case_control(df, c,drop_feature=0,strength=10,random_state=None):
     rng = np.random.default_rng(random_state)
 
     feature = df.select_dtypes(include=[np.number]).drop(columns=["target"]).columns[drop_feature]
-    values = df.loc[df["target"]>0,feature].astype(float).to_numpy()
+    values = df[feature].values
     n_values = len(values)
 
-    modifier = np.ones(n_values)
-    modifier *=strength
-    modifier /= np.sqrt(len(values))
+    weight = np.ones(n_values)
+    weight *= strength
+    weight /= np.sqrt(len(values))
 
-    probs = 1./(1+np.exp(-(np.transpose(values) * modifier)))
-    probs = pd.Series(probs,index=df.loc[df["target"]>0].index)
-    requested_n = int(len(probs) * c)
-    idx = probs.index.to_numpy()
-    probs = probs / probs.sum()
-    sampled_idx = rng.choice(idx, size=requested_n, replace=False, p=probs)
+    probs = 1./(1+np.exp(-(np.transpose(values) * weight)))
+    probs = pd.Series(probs)
    
     df["PU"] = 0
-    sampled_idx = df.loc[df["target"]>0].sample(n=requested_n,weights=probs, random_state=random_state).index
-    df.loc[sampled_idx, "PU"] = 1
-   
+    idx = df.sample(frac=c, weights=probs, random_state=random_state).index
+    df.loc[idx, "PU"] = 1
+    df.loc[df["target"]==0,"PU"] = 0
+    CONFIG.SAR_c_log = np.round(df['PU'].sum()/df['target'].sum(),3)
+    #Make it case control
     df = df.drop(columns=feature)
+
     return df
 
 

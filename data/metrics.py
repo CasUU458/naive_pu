@@ -100,9 +100,9 @@ def plot_metric_bar(classifiers, X_test, y_test, clf_names=None, path="logs"):
     for clf in classifiers:
         y_pred = clf.predict(X_test.values)
         accuracy = accuracy_score(y_test, y_pred)
-        precision = precision_score(y_test, y_pred, pos_label=1, average='binary')
-        recall = recall_score(y_test, y_pred, pos_label=1, average='binary')
-        f1 = f1_score(y_test, y_pred, pos_label=1, average='binary')
+        precision = precision_score(y_test, y_pred, pos_label=1, average='macro')
+        recall = recall_score(y_test, y_pred, pos_label=1, average='macro')
+        f1 = f1_score(y_test, y_pred, pos_label=1, average='macro')
         metrics_values.append([accuracy, precision, recall, f1])
 
     metrics_values = np.array(metrics_values)  # shape: (n_classifiers, n_metrics)

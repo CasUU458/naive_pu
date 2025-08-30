@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from data.datasets import get_pd_dataset,prepare_and_split_data
 from data.dataset_helpers import SAR
-from config import CONFIG
+from config import CONFIG, Config
 import matplotlib.pyplot as plt
 from classifiers.TM_log_reg import TwoModelLogReg
 from classifiers.classic_log_reg import ClassicLogReg
@@ -24,7 +24,9 @@ import json
 import warnings
 warnings.filterwarnings("ignore")  # suppress all warnings
 from datetime import datetime
-
+import sys
+sys.path.append("/Users/cas/Documents/putm")
+from putm import PUtm
 
 
 global DATASETS #Datasets to use for experiments
@@ -44,17 +46,27 @@ global INCLUDE_ORACLE
 
 os.makedirs("EXPERIMENTS", exist_ok=True)
 
+def get_models():
+    clf = {
+        "classic": ClassicLogReg(),
+        "naive": NaiveLogReg(),
+        "oracle": ClassicLogReg()
+    }
+
+    clf_y = LogisticRegression(max_iter=CONFIG.max_iterations,penalty=CONFIG.penalty)
+    clf_e = LogisticRegression(max_iter=CONFIG.max_iterations,penalty=CONFIG.penalty)
+    TM = PUtm(clf=clf_y, clf_ex=clf_e,epochs=CONFIG.max_loop_iterations)
+    clf["two_model"] = TM 
+
+    return clf
+
+
 def set_global_vars():
     global DATASETS
-    DATASETS = {"mock":get_pd_dataset(name="mock"),"diabetes":get_pd_dataset(name="diabetes"),"breastcancer":get_pd_dataset(name="breastcancer"),"mnist":None}
+    DATASETS = {"mock":None,"diabetes":get_pd_dataset(name="diabetes"),"breastcancer":get_pd_dataset(name="breastcancer"),"mnist":None}
 
     global MODELS
-    MODELS = {
-    "classic": ClassicLogReg(tolerance=1e-5),
-    "naive": NaiveLogReg(tolerance=1e-5,lr=0.003,lr_c=0.003),
-    "two_model": TwoModelLogReg(epsilon=1e-4),
-    "oracle": ClassicLogReg(tolerance=1e-5)
-    }
+    MODELS = get_models()
 
     global ITERS
     ITERS = np.arange(0,10,1)
@@ -68,7 +80,13 @@ def set_global_vars():
     INCLUDE_ORACLE = True
 
 def reset_config():
-    from config import CONFIG
+          # CONFIG.RANDOM_SEED = False
+            CONFIG.device = 'cpu'
+            CONFIG.dataset = 'mock' #MNIST, BreastCancer #mock or diabetes
+            CONFIG.test_size = 0.2
+            CONFIG.label_mechanism = 'SCAR_1_50'
+            CONFIG.positive_ratio = None # number of positives / number of negatives or None to ignore
+            CONFIG.scaler = "standard" # or "minmax"
 
 
 #Each iteration result template
@@ -122,6 +140,9 @@ def experiment():
     result = make_test_result_df(sets=[EXPERIMENT_VALUES,DATASETS, ITERS, MODELS], columns=[EXPERIMENT_ATTR,"dataset","iter","model"])
     result.to_pickle(os.path.join(exp_path, "init.pkl"))
     
+    result["c log"] = 0.0
+
+
     for exp in EXPERIMENT_VALUES:
         CONFIG.set_attr(EXPERIMENT_ATTR, exp)
         
@@ -130,9 +151,8 @@ def experiment():
             CONFIG.set_random_seed(seed)
             print(f"{i} {EXPERIMENT_ATTR}: {exp}, SEED: {seed}")
             
-            for dataset_name,dataset in DATASETS.items():
-                if dataset_name.lower() == "mnist":
-                    dataset = get_mnist(seed)
+            for dataset_name,dataset in get_datasets(DATASETS).items():
+                
 
                 X_train,s_train,X_test,y_test = prepare_and_split_data(dataset)
                 Y_TRAIN = CONFIG.true_train_labels
@@ -160,6 +180,9 @@ def experiment():
                         )
                         result.loc[mask,res.index] = res.values
 
+                        if CONFIG.label_mechanism.startswith("SCAR") or CONFIG.label_mechanism.startswith("case"):
+                            result.loc[mask,"c log"] = CONFIG.SAR_c_log
+
                     except Exception as e:
                         print(f"Error occurred for {model_name} on {dataset_name}: {e}")
         
@@ -174,7 +197,7 @@ def double_experiment():
     os.makedirs(exp_path, exist_ok=True)
     result = make_test_result_df(sets=[EXPERIMENT_VALUES,EXPERIMENT_VALUES_2,DATASETS, ITERS, MODELS], columns=[EXPERIMENT_ATTR,EXPERIMENT_ATTR_2,"dataset","iter","model"])
     result.to_pickle(os.path.join(exp_path, "init.pkl"))
-    
+    result["c log"] = 0.0
     for exp in EXPERIMENT_VALUES:
         CONFIG.set_attr(EXPERIMENT_ATTR, exp)
 
@@ -186,10 +209,7 @@ def double_experiment():
                 CONFIG.set_random_seed(seed)
                 print(f"{i} {EXPERIMENT_ATTR}: {exp}, SEED: {seed}")
                 
-                for dataset_name,dataset in DATASETS.items():
-                    
-                    if dataset_name.lower() == "mnist":
-                        dataset = get_mnist(seed)
+                for dataset_name,dataset in get_datasets(DATASETS).items():
                 
                     X_train,s_train,X_test,y_test = prepare_and_split_data(dataset)
                     Y_TRAIN = CONFIG.true_train_labels
@@ -210,6 +230,9 @@ def double_experiment():
                                 (result["model"] == model_name)
                             )
                             result.loc[mask,res.index] = res.values
+                            if CONFIG.label_mechanism.startswith("SCAR") or CONFIG.label_mechanism.startswith("case"):
+                                result.loc[mask,"c log"] = CONFIG.SAR_c_log
+
                         except Exception as e:
                             print(f"Error occurred for {model_name} on {dataset_name}: {e}")
         result.to_pickle(os.path.join(exp_path, f"TEMP_{exp}_{exp2}_{dataset_name}_{model_name}_{i}.pkl"))
@@ -222,13 +245,37 @@ def get_mnist(seed):
     name = f"mnist_{digits}"
     return get_pd_dataset(name=name)
 
+def get_mock():
+    return get_pd_dataset(name="mock")
+
+def get_datasets(DATASETS):
+
+    datasets = {}
+    for key,item in DATASETS.items():
+        if key == "mnist":
+            datasets["mnist"] = get_mnist(CONFIG.random_state)
+        elif key == "mock":
+            datasets["mock"] = get_mock()
+        else:
+            datasets[key] = item
+    return datasets
+
 if __name__ == "__main__":
 
-    # label_frequencies = [0.005,0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 1.0]
-    label_frequencies = [0.01,0.1,0.5,1.0]
+    label_frequencies = [0.005,0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 1.0]
+    # label_frequencies = [0.01,0.1,0.5,1.0]
+
+
+
 
     reset_config()
     set_global_vars()
+
+    # DATASETS = {"mock": None}
+    # ITERS = [0]
+    # MODELS = {"two_model": TwoModelLogReg()}
+
+
     print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
     print("\n -- LABEL FREQUENCY -- \n")
@@ -236,8 +283,6 @@ if __name__ == "__main__":
         INCLUDE_ORACLE = False
         EXPERIMENT_VALUES = label_frequencies
         EXPERIMENT_ATTR = "c"
-        DATASETS = {"mnist": None}
-        ITERS = np.arange(0, 3, 1)
         experiment()
     except:
         print("Error occurred during LABEL FREQUENCY experiment")
@@ -246,86 +291,62 @@ if __name__ == "__main__":
     # set_global_vars()
     # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
-    # print("\n -- LABEL MECHANISM -- \n")
-    # try:
-    #     CONFIG.c  = 0.2
-    #     EXPERIMENT_VALUES=["SCAR_1_1","SAR_1_1","SAR_1_5","SAR_1_10","SAR_1_100","SAR_4_5","SAR_4_3","SAR_10_5","casecontrol_1","casecontrol_5","casecontrol_10","casecontrol_100"]
-    #     EXPERIMENT_ATTR = "LABELING_MECHANISM"
-    #     experiment()
-    # except:
-    #     print("Error occurred during label SCAR/SAR experiment")
+    print("\n -- LABEL MECHANISM -- \n")
+    try:
+        CONFIG.c  = 0.2
+        EXPERIMENT_VALUES=["SCAR_1_1","SAR_1_100","SAR_1_250","SAR_1_1000","SAR_4_5","SAR_4_3","SAR_10_5","casecontrol_200","casecontrol_400","casecontrol_1000"]
+        EXPERIMENT_ATTR = "label_mechanism"
+        experiment()
+    except:
+        print("Error occurred during label SCAR/SAR experiment")
 
     
-    # reset_config()
+    reset_config()
     # set_global_vars()
-    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
-    # print("\n -- LABEL DISTRIBUTION -- \n")
+    print("\n -- LABEL DISTRIBUTION -- \n")
 
-    # try:
-    #     CONFIG.c  = 0.2
-    #     EXPERIMENT_VALUES= np.arange(0.1,0.55,0.05)
-    #     EXPERIMENT_ATTR = "LABEL_DISTRIBUTION"
-    #     experiment()
-    # except:
-    #     print("Error occurred during label distribution experiment")
+    try:
+        CONFIG.c  = 0.2
+        EXPERIMENT_VALUES= [0.1,0.2,0.3,0.4,0.5]
+        EXPERIMENT_ATTR = "positive_ratio"
+        experiment()
+    except:
+        print("Error occurred during label distribution experiment")
 
-    # reset_config()
+    reset_config()
     # set_global_vars()
-    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
-    
-    # # print("\n -- LABEL MECHANISM CASECONTROL -- \n")
-    # # try:
-    # #     CONFIG.c = 0.2
-    # #     EXPERIMENT_VALUES = ["casecontrol_1","casecontrol_5","casecontrol_10","case_control_100"]
-    # #     EXPERIMENT_ATTR = "LABELING_MECHANISM"
-    # #     experiment()
-    # # except():
-    # #     print('Case control failed')
-
-    # reset_config()
+    reset_config()
     # set_global_vars()
-    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
-    # print("\n -- SAR and LABEL DISTRIBUTION -- \n")
-    # try:
-    #     CONFIG.c  = 0.2
-    #     EXPERIMENT_VALUES=["SCAR_1_1","SAR_1_1","SAR_1_5","SAR_1_10","SAR_1_100","SAR_4_5","SAR_4_3","SAR_10_5"]
-    #     EXPERIMENT_ATTR = "LABELING_MECHANISM"
-    #     EXPERIMENT_VALUES_2= np.arange(0.1,0.55,0.05)
-    #     EXPERIMENT_ATTR_2 = "LABEL_DISTRIBUTION"
-    #     double_experiment()
-    # except:
-    #     print("Error occurred during SAR and label distribution experiment")
+    print("\n -- SAR and LABEL DISTRIBUTION -- \n")
+    try:
+        CONFIG.c  = 0.2
+        EXPERIMENT_VALUES=["SCAR_1_1","SAR_1_100","SAR_1_200","SAR_1_400","SAR_1_1000","casecontrol_200","casecontrol_600"]
+        EXPERIMENT_ATTR = "label_mechanism"
+        EXPERIMENT_VALUES_2= [0.1,0.2,0.3,0.4,0.5]
+        EXPERIMENT_ATTR_2 = "positive_ratio"
+        double_experiment()
+    except:
+        print("Error occurred during SAR and label distribution experiment")
 
 
-    # reset_config()
+    reset_config()
     # set_global_vars()
-    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
-    # print("\n -- SAR and c -- \n")
-    # try:
-    #     EXPERIMENT_VALUES=["SCAR_1_1","SAR_1_1","SAR_1_5","SAR_1_10","SAR_1_100","SAR_4_5","SAR_4_3","SAR_10_5"]
-    #     EXPERIMENT_ATTR = "LABELING_MECHANISM"
-    #     EXPERIMENT_VALUES_2= label_frequencies
-    #     EXPERIMENT_ATTR_2 = "c"
-    #     double_experiment()
-    # except:
-    #     print("Error occurred during SAR and c  experiment")
-
-    # reset_config()
-    # set_global_vars()
-    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
-
-    # print("\n -- label distribution and c -- \n")
-    # try:
-    #     EXPERIMENT_VALUES= label_frequencies
-    #     EXPERIMENT_ATTR = "LABEL_DISTRIBUTION"
-    #     EXPERIMENT_VALUES_2=label_frequencies
-    #     EXPERIMENT_ATTR_2 = "c"
-    #     double_experiment()
-    # except:
-    #     print("Error occurred during c and label distribution experiment")
-    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    print("\n -- label distribution and c -- \n")
+    try:
+        EXPERIMENT_VALUES= [0.1,0.2,0.3,0.4,0.5]
+        EXPERIMENT_ATTR = "positive_ratio"
+        EXPERIMENT_VALUES_2=label_frequencies
+        EXPERIMENT_ATTR_2 = "c"
+        double_experiment()
+    except:
+        print("Error occurred during c and label distribution experiment")
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 

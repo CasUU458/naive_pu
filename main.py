@@ -11,6 +11,7 @@ import time
 from classifiers.classic_log_reg import ClassicLogReg
 from classifiers.naive_log_reg import NaiveLogReg
 from classifiers.TM_log_reg import TwoModelLogReg
+from classifiers.TM_log_reg_clean import TwoModelLogReg_clean
 from data.datasets import prepare_and_split_data, get_pd_dataset
 import logging
 import os
@@ -18,17 +19,20 @@ import os
 import sys
 sys.path.append("/Users/cas/Documents/putm")
 from putm import PUtm
-from sklearn.linear_model import LogisticRegression
 import json
 import warnings
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+
 warnings.filterwarnings("ignore")  # suppress all warnings
 
 def experiment():
     t = time.time()
     print("Current time:", t)
+    CONFIG.set_random_seed(seed=np.random.randint(0, 10000))
 
     #import config settings from json file
-    CONFIG.set_random_seed(seed=42)  # set the random seed for reproducibility
+    # CONFIG.set_random_seed(seed=42)  # set the random seed for reproducibility
 
     #check if logs directory exists, if not exist create it
     log_path = f"logs/{time.strftime('%Y-%m-%d %H-%M-%S')}"
@@ -72,36 +76,57 @@ def experiment():
     logging.info(f"Validation set shape: {VAL[0].shape, VAL[1].shape, VAL[2].shape}")
 
     # Fit the Classic Logistic Regression model
-    clf = ClassicLogReg()
-    clf = do_classification(clf, "Classic Logistic Regression", X_train, y_train, X_test, y_test)
+    # clf = ClassicLogReg()
+    # clf = do_classification(clf, "Classic Logistic Regression", X_train, y_train, X_test, y_test)
+    clf = PUtm(clf=LogisticRegression(max_iter=CONFIG.max_iterations,penalty=CONFIG.penalty),clf_ex=LogisticRegression(max_iter=CONFIG.max_iterations,penalty=CONFIG.penalty))
+    clf = do_classification(clf, "Prof Logistic Regression", X_train, y_train, X_test, y_test)
+
 
     # Fit the Sklearn Logistic Regression model as a baseline
 
-    TM_clf = TwoModelLogReg(validation=VAL)
-    TM_clf = do_classification(TM_clf, "Two Model Logistic Regression", X_train, y_train, X_test, y_test)
+    y_clf = LogisticRegression(max_iter=CONFIG.max_iterations,penalty=CONFIG.penalty)
+    e_clf = LogisticRegression(max_iter=CONFIG.max_iterations,penalty=CONFIG.penalty)
+    TM_clf = TwoModelLogReg_clean(y_clf=y_clf,e_clf=e_clf)
+    TM_clf = do_classification(TM_clf, "Two Model Logistic Regression CLEAN", X_train, y_train, X_test, y_test)
     # sk_clf = do_classification(SklearnLogisticRegression(penalty=None, max_iter=CONFIG. max_iterations), "Sklearn Logistic Regression", X_train, y_train, X_test, y_test)
     # TM_clf = None
     # Fit the Naive Logistic Regression model as a baseline
-    naive_clf = do_classification(NaiveLogReg(), "Naive Logistic Regression", X_train, y_train, X_test, y_test)
+    naive_clf = do_classification(TwoModelLogReg(), "Two Logistic Regression ", X_train, y_train, X_test, y_test)
     return clf,naive_clf, TM_clf,X_test, y_test, log_path
 
 def evaluate(clf, naive_clf, TM_clf, X_test, y_test, log_path):
-
-    plot_loss_curves(clf, naive_clf, c=CONFIG.c,path=log_path)
-  
-
     clfs = [clf, naive_clf, TM_clf]
-    clf_names = ["Classic Logistic Regression", "Naive Logistic Regression", "Two model logic Regression"]
-    plot_probabilities(clf, naive_clf, X_test, y_test,name_1=clf_names[0],name_2=clf_names[1],path=log_path)
-    # plot_probabilities(clf, TM_clf, X_test, y_test,name_1=clf_names[0],name_2=clf_names[2],path=log_path)
-
+    clf_names = ["Prof TM", "Grafiek Fabriek TM + sklearn", "Grafiek Fabriek"]
     plot_metric_bar(clfs, X_test, y_test, clf_names=clf_names, path=log_path)
 
 
-    plot_feature_weights(naive_clf, X_test.columns.to_numpy(),name=clf_names[1],path=log_path)
-    plot_feature_weights(TM_clf._get_y_clf(), X_test.columns.to_numpy(),name=clf_names[2],path=log_path)
-    plot_feature_weights(TM_clf._get_e_clf(), X_test.columns.to_numpy(),name=f"{clf_names[2]} e(x)",path=log_path)
-    plot_validation(TM_clf,path=log_path)
+    try:
+        plot_loss_curves(clf, naive_clf, c=CONFIG.c,path=log_path)
+    except:
+        print("Could not plot loss curves")
+
+    try:
+
+        plot_probabilities(clf, naive_clf, X_test, y_test,name_1=clf_names[0],name_2=clf_names[1],path=log_path)
+        # plot_probabilities(clf, TM_clf, X_test, y_test,name_1=clf_names[0],name_2=clf_names[2],path=log_path)
+    except:
+        print("Could not plot probabilities")
+
+
+    try:
+        plot_feature_weights(naive_clf, X_test.columns.to_numpy(),name=clf_names[1],path=log_path)
+    except:
+        print("Could not plot naive feature weights")
+
+    try:
+        plot_feature_weights(TM_clf._get_y_clf(), X_test.columns.to_numpy(),name=clf_names[2],path=log_path)
+        plot_feature_weights(TM_clf._get_e_clf(), X_test.columns.to_numpy(),name=f"{clf_names[2]} e(x)",path=log_path)
+    except:
+        print("Could not plot TM feature weights")
+    try:
+        plot_validation(TM_clf,path=log_path)
+    except:
+        print("Could not plot validation curves")
     plt.show()
     return 0
 

@@ -146,9 +146,9 @@ def prepare_and_split_data(data,
 
 def mock_dataset():
     random_state = CONFIG.random_state  
-    n_positives = 65
-    n_negatives = int(n_positives*1/(1/(50)))
-    data = make_classification(n_samples=2*n_negatives, n_features=4, n_informative=4, n_redundant=0, random_state=random_state)
+    n_positives = 650
+    n_negatives = int(n_positives*1.50)
+    data = make_classification(n_samples=2*n_negatives, n_features=4, n_informative=4, n_redundant=0,flip_y=0.01,class_sep=1,random_state=random_state)
     x = pd.DataFrame(data[0], columns=[f"feature_{i}" for i in range(4)])
     x['target'] = data[1]
     x_positive = x[x['target'] == 1]

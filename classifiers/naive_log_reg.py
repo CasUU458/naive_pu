@@ -141,16 +141,17 @@ class NaiveLogReg(BaseLogReg):
             loss_b.backward() # calculate grads
             self.optimizer_b.step() # update b
 
-            self.loss_c_log[_] = loss_b.item()
-            self.c_log[_] = b2c(self.b.item())
+            with torch.no_grad():
+                self.loss_c_log[_] = loss_b.item()
+                self.c_log[_] = b2c(self.b.item())
 
-            if _ % 1000 == 0:
-                print(
-                    f"Iteration {_}, Loss: {_loss(y_t, y_predicted).item()} Loss b: {loss_b.item()}, c: {b2c(self.b.item())}")
+                if _ % 1000 == 0:
+                    print(
+                        f"Iteration {_}, Loss: {_loss(y_t, y_predicted).item()} Loss b: {loss_b.item()}, c: {b2c(self.b.item())}")
 
-            if abs(prev_loss - loss.item()) < self.tolerance:
-                print(f"Converged after {_} iterations")
-                break
+                if abs(prev_loss - loss.item()) < self.tolerance:
+                    print(f"Converged after {_} iterations")
+                    break
 
             prev_loss = loss.item()
         return self

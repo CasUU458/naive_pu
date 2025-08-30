@@ -5,35 +5,35 @@ class Config:
         if not hasattr(cls, 'instance'):
             cls.instance = super(Config, cls).__new__(cls)
 
-            cls.c = 0.3 # Labeling frequency
+            cls.c = 0.2 # Labeling frequency
 
             # cls.RANDOM_SEED = False
             cls.device = 'cpu'
-            cls.dataset = 'diabetes' #MNIST, BreastCancer #mock or diabetes
+            cls.dataset = 'mock' #MNIST, BreastCancer #mock or diabetes
             cls.test_size = 0.2
-            cls.label_mechanism = 'SCAR_1_10000'
+            cls.label_mechanism = 'SCAR_1_100'
             cls.positive_ratio = None # number of positives / number of negatives or None to ignore
             cls.scaler = "standard" # or "minmax"
 
 
-            cls.max_iterations= 2000
+            cls.max_iterations= 300
             cls.naive_c_guess = None
-            cls.lr = 0.001
+            cls.lr = 0.005
 
-            cls.penalty = None #None, l2 or "l1"
+            cls.penalty = "l2" #None, l2 or "l1"
             cls.solver = 'adam' # lbfgs or adam
 
             cls.random_state = 42
             cls.tolerance = 1e-4
 
             #Naive model parameters
-            cls.lr_c =  0.001
+            cls.lr_c =  0.005
     
 
             # Two model parameters
-            cls.epsilon = 1e-3
+            cls.epsilon = 1e-4
             cls.alpha = None
-            cls.max_loop_iterations = 30
+            cls.max_loop_iterations = 100
             cls.validation_frac = None
 
             # state variables
@@ -43,7 +43,7 @@ class Config:
             cls.true_train_labels = None
             cls.PU_test_labels = None
             cls.dominant_features = None
-
+            cls.SAR_c_log = None
         return cls.instance
 
     # @property
