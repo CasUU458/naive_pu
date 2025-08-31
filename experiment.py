@@ -55,7 +55,7 @@ def get_models():
 
     clf_y = LogisticRegression(max_iter=CONFIG.max_iterations,penalty=CONFIG.penalty)
     clf_e = LogisticRegression(max_iter=CONFIG.max_iterations,penalty=CONFIG.penalty)
-    TM = PUtm(clf=clf_y, clf_ex=clf_e,epochs=CONFIG.max_loop_iterations)
+    TM = PUtm(clf=clf_y, clf_ex=clf_e,epochs=CONFIG.max_loop_iterations,epsilon=CONFIG.epsilon)
     clf["two_model"] = TM 
 
     return clf
@@ -139,9 +139,9 @@ def experiment():
     os.makedirs(exp_path, exist_ok=True)
     result = make_test_result_df(sets=[EXPERIMENT_VALUES,DATASETS, ITERS, MODELS], columns=[EXPERIMENT_ATTR,"dataset","iter","model"])
     result.to_pickle(os.path.join(exp_path, "init.pkl"))
-    
-    result["c log"] = 0.0
 
+    result["calculated_c"] = 0.0
+    result["feature"] = ""
 
     for exp in EXPERIMENT_VALUES:
         CONFIG.set_attr(EXPERIMENT_ATTR, exp)
@@ -180,8 +180,9 @@ def experiment():
                         )
                         result.loc[mask,res.index] = res.values
 
-                        if CONFIG.label_mechanism.startswith("SCAR") or CONFIG.label_mechanism.startswith("case"):
-                            result.loc[mask,"c log"] = CONFIG.SAR_c_log
+                        if CONFIG.label_mechanism.lower().startswith("sar") or CONFIG.label_mechanism.lower().startswith("case"):
+                            result.loc[mask,"calculated_c"] = CONFIG.calculated_c
+                            result.loc[mask,"feature"] = f"{CONFIG.dominant_features}"
 
                     except Exception as e:
                         print(f"Error occurred for {model_name} on {dataset_name}: {e}")
@@ -197,7 +198,8 @@ def double_experiment():
     os.makedirs(exp_path, exist_ok=True)
     result = make_test_result_df(sets=[EXPERIMENT_VALUES,EXPERIMENT_VALUES_2,DATASETS, ITERS, MODELS], columns=[EXPERIMENT_ATTR,EXPERIMENT_ATTR_2,"dataset","iter","model"])
     result.to_pickle(os.path.join(exp_path, "init.pkl"))
-    result["c log"] = 0.0
+    result["calculated_c"] = 0.0
+    result["feature"] = ""
     for exp in EXPERIMENT_VALUES:
         CONFIG.set_attr(EXPERIMENT_ATTR, exp)
 
@@ -221,6 +223,7 @@ def double_experiment():
                                 clf.fit(X_train,Y_TRAIN)
                             else:
                                 clf.fit(X_train,s_train)
+                            
                             y_pred = clf.predict(X_test)
                             res = evaluate_step(y_test,y_pred)
                             mask =(
@@ -230,8 +233,10 @@ def double_experiment():
                                 (result["model"] == model_name)
                             )
                             result.loc[mask,res.index] = res.values
-                            if CONFIG.label_mechanism.startswith("SCAR") or CONFIG.label_mechanism.startswith("case"):
-                                result.loc[mask,"c log"] = CONFIG.SAR_c_log
+
+                            if CONFIG.label_mechanism.lower().startswith("sar") or CONFIG.label_mechanism.lower().startswith("case"):
+                                result.loc[mask,"calculated_c"] = CONFIG.calculated_c
+                                result.loc[mask,"feature"] = f"{CONFIG.dominant_features}"
 
                         except Exception as e:
                             print(f"Error occurred for {model_name} on {dataset_name}: {e}")
@@ -262,7 +267,6 @@ def get_datasets(DATASETS):
 
 if __name__ == "__main__":
 
-    label_frequencies = [0.005,0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 1.0]
     # label_frequencies = [0.01,0.1,0.5,1.0]
 
 
@@ -271,30 +275,54 @@ if __name__ == "__main__":
     reset_config()
     set_global_vars()
 
-    # DATASETS = {"mock": None}
-    # ITERS = [0]
-    # MODELS = {"two_model": TwoModelLogReg()}
-
-
-    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
-
-    print("\n -- LABEL FREQUENCY -- \n")
-    try:
-        INCLUDE_ORACLE = False
-        EXPERIMENT_VALUES = label_frequencies
-        EXPERIMENT_ATTR = "c"
-        experiment()
-    except:
-        print("Error occurred during LABEL FREQUENCY experiment")
-
-    # reset_config()
-    # set_global_vars()
+    # DATASETS = {"mnist": None}
+    # # clf_y = LogisticRegression(max_iter=CONFIG.max_iterations,penalty=CONFIG.penalty)
+    # # clf_e = LogisticRegression(max_iter=CONFIG.max_iterations,penalty=CONFIG.penalty)
+    # clf = ClassicLogReg()
+    # MODELS = {"classic": clf}
+    # label_frequencies = np.arange(0.1,1.1,0.1)
+    # label_frequencies = np.concatenate(([0.01,0.05],label_frequencies))
     # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+
+    # print("\n -- LABEL FREQUENCY -- \n")
+    # try:
+    #     INCLUDE_ORACLE = False
+    #     EXPERIMENT_VALUES = label_frequencies
+    #     EXPERIMENT_ATTR = "c"
+    #     experiment()
+    # except:
+    #     print("Error occurred during LABEL FREQUENCY experiment")
+
+
+    # DATASETS = {"mnist": None,"breastcancer":get_pd_dataset("breastcancer")}
+    # clf_y = LogisticRegression()
+    # clf_e = LogisticRegression()
+    # clf = PUtm(clf=clf_y, clf_ex=clf_e,epochs=CONFIG.max_loop_iterations,epsilon=1e-5)
+    # MODELS = {"two_model": clf}
+    # label_frequencies = [0.005,0.01,0.02,0.04,0.05,0.1,0.2, 0.25,0.35,0.5,0.6,0.75,0.8, 1.0]
+    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+
+    # print("\n -- LABEL FREQUENCY -- \n")
+    # try:
+    #     INCLUDE_ORACLE = False
+    #     EXPERIMENT_VALUES = label_frequencies
+    #     EXPERIMENT_ATTR = "c"
+    #     experiment()
+    # except:
+    #     print("Error occurred during LABEL FREQUENCY experiment")
+    
+    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+
+
+
+    reset_config()
+    set_global_vars()
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
     print("\n -- LABEL MECHANISM -- \n")
     try:
-        CONFIG.c  = 0.2
-        EXPERIMENT_VALUES=["SCAR_1_1","SAR_1_100","SAR_1_250","SAR_1_1000","SAR_4_5","SAR_4_3","SAR_10_5","casecontrol_200","casecontrol_400","casecontrol_1000"]
+        CONFIG.c  = 1
+        EXPERIMENT_VALUES=["SCAR_1_1","SAR_1_0.0","SAR_1_0.2","SAR_1_0.4","SAR_1_0.6","SAR_1_0.8","SAR_1_0.9","SAR_1_0.95","SAR_4_5","SAR_5_4","casecontrol_0.5","casecontrol_0.75","casecontrol_0.9"]
         EXPERIMENT_ATTR = "label_mechanism"
         experiment()
     except:
@@ -305,48 +333,47 @@ if __name__ == "__main__":
     # set_global_vars()
     print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
-    print("\n -- LABEL DISTRIBUTION -- \n")
+    # print("\n -- LABEL DISTRIBUTION -- \n")
 
-    try:
-        CONFIG.c  = 0.2
-        EXPERIMENT_VALUES= [0.1,0.2,0.3,0.4,0.5]
-        EXPERIMENT_ATTR = "positive_ratio"
-        experiment()
-    except:
-        print("Error occurred during label distribution experiment")
+    # try:
+    #     CONFIG.c  = 0.2
+    #     EXPERIMENT_VALUES= [0.1,0.2,0.3,0.4,0.5]
+    #     EXPERIMENT_ATTR = "positive_ratio"
+    #     experiment()
+    # except:
+    #     print("Error occurred during label distribution experiment")
+
+    # reset_config()
+    # # set_global_vars()
+    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
     reset_config()
-    # set_global_vars()
-    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
-
     reset_config()
-    # set_global_vars()
-    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
     print("\n -- SAR and LABEL DISTRIBUTION -- \n")
     try:
-        CONFIG.c  = 0.2
-        EXPERIMENT_VALUES=["SCAR_1_1","SAR_1_100","SAR_1_200","SAR_1_400","SAR_1_1000","casecontrol_200","casecontrol_600"]
+        EXPERIMENT_VALUES=["SAR_1_0.0","SAR_1_0.2","SAR_1_0.4","SAR_1_0.6","SAR_1_0.8","SAR_1_0.9"]
         EXPERIMENT_ATTR = "label_mechanism"
         EXPERIMENT_VALUES_2= [0.1,0.2,0.3,0.4,0.5]
-        EXPERIMENT_ATTR_2 = "positive_ratio"
+        EXPERIMENT_ATTR_2 = "c"
         double_experiment()
     except:
         print("Error occurred during SAR and label distribution experiment")
 
 
-    reset_config()
-    # set_global_vars()
-    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    # reset_config()
+    # # set_global_vars()
+    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
-    print("\n -- label distribution and c -- \n")
-    try:
-        EXPERIMENT_VALUES= [0.1,0.2,0.3,0.4,0.5]
-        EXPERIMENT_ATTR = "positive_ratio"
-        EXPERIMENT_VALUES_2=label_frequencies
-        EXPERIMENT_ATTR_2 = "c"
-        double_experiment()
-    except:
-        print("Error occurred during c and label distribution experiment")
-    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    # print("\n -- label distribution and c -- \n")
+    # try:
+    #     EXPERIMENT_VALUES= [0.1,0.2,0.3,0.4,0.5]
+    #     EXPERIMENT_ATTR = "positive_ratio"
+    #     EXPERIMENT_VALUES_2=label_frequencies
+    #     EXPERIMENT_ATTR_2 = "c"
+    #     double_experiment()
+    # except:
+    #     print("Error occurred during c and label distribution experiment")
+    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 

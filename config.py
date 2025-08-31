@@ -16,7 +16,7 @@ class Config:
             cls.scaler = "standard" # or "minmax"
 
 
-            cls.max_iterations= 300
+            cls.max_iterations= 500
             cls.naive_c_guess = None
             cls.lr = 0.005
 
@@ -24,14 +24,14 @@ class Config:
             cls.solver = 'adam' # lbfgs or adam
 
             cls.random_state = 42
-            cls.tolerance = 1e-4
+            cls.tolerance = 1e-5
 
             #Naive model parameters
             cls.lr_c =  0.005
     
 
             # Two model parameters
-            cls.epsilon = 1e-4
+            cls.epsilon = 1e-5
             cls.alpha = None
             cls.max_loop_iterations = 100
             cls.validation_frac = None
@@ -43,7 +43,9 @@ class Config:
             cls.true_train_labels = None
             cls.PU_test_labels = None
             cls.dominant_features = None
-            cls.SAR_c_log = None
+            cls.calculated_c = None
+
+            cls.PROBS = []
         return cls.instance
 
     # @property
