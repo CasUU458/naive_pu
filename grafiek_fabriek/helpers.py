@@ -14,7 +14,7 @@ def get_n_labels(dataset,c_values):
     lib = {}
     for c in c_values:
         value = df.loc[df["target"]>0,"target"].sample(frac=c).sum()
-        lib[c] = f"{c} | {int(value)}"
+        lib[c] = f"{c:.2f} | {int(value)}"
     lib["title"] = f"labels: {df.shape[0]}, class prior = {np.round(class_prior,2)}"
 
     return lib

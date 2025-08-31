@@ -87,6 +87,8 @@ def reset_config():
             CONFIG.label_mechanism = 'SCAR_1_50'
             CONFIG.positive_ratio = None # number of positives / number of negatives or None to ignore
             CONFIG.scaler = "standard" # or "minmax"
+            CONFIG.label_noise = None
+            CONFIG.c = 0.2 # Labeling frequency
 
 
 #Each iteration result template
@@ -269,7 +271,7 @@ if __name__ == "__main__":
 
     # label_frequencies = [0.01,0.1,0.5,1.0]
 
-
+    
 
 
     reset_config()
@@ -315,65 +317,99 @@ if __name__ == "__main__":
 
 
 
-    reset_config()
-    set_global_vars()
-    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    # reset_config()
+    # set_global_vars()
+    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
-    print("\n -- LABEL MECHANISM -- \n")
-    try:
-        CONFIG.c  = 1
-        EXPERIMENT_VALUES=["SCAR_1_1","SAR_1_0.0","SAR_1_0.2","SAR_1_0.4","SAR_1_0.6","SAR_1_0.8","SAR_1_0.9","SAR_1_0.95","SAR_4_5","SAR_5_4","casecontrol_0.5","casecontrol_0.75","casecontrol_0.9"]
-        EXPERIMENT_ATTR = "label_mechanism"
-        experiment()
-    except:
-        print("Error occurred during label SCAR/SAR experiment")
+    # print("\n -- LABEL MECHANISM -- \n")
+    # try:
+    #     CONFIG.c  = 1
+    #     tresholds = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.95]
+    #     exp_values= [f"SCAR_1_{t}" for t in tresholds]
+    #     # EXPERIMENT_VALUES=["SCAR_1_1","SAR_1_0.0","SAR_1_0.2","SAR_1_0.4","SAR_1_0.6","SAR_1_0.8","SAR_1_0.9","SAR_1_0.95","SAR_4_5","SAR_5_4","casecontrol_0.5","casecontrol_0.75","casecontrol_0.9"]
+    #     EXPERIMENT_VALUES = exp_values
+    #     EXPERIMENT_ATTR = "label_mechanism"
+    #     experiment()
+    # except:
+    #     print("Error occurred during label SCAR/SAR experiment")
 
     
     reset_config()
     # set_global_vars()
     print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
-    # print("\n -- LABEL DISTRIBUTION -- \n")
+    print("\n -- LABEL DISTRIBUTION -- \n")
 
-    # try:
-    #     CONFIG.c  = 0.2
-    #     EXPERIMENT_VALUES= [0.1,0.2,0.3,0.4,0.5]
-    #     EXPERIMENT_ATTR = "positive_ratio"
-    #     experiment()
-    # except:
-    #     print("Error occurred during label distribution experiment")
-
-    # reset_config()
-    # # set_global_vars()
-    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
-
-    reset_config()
-    reset_config()
-    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
-
-    print("\n -- SAR and LABEL DISTRIBUTION -- \n")
     try:
-        EXPERIMENT_VALUES=["SAR_1_0.0","SAR_1_0.2","SAR_1_0.4","SAR_1_0.6","SAR_1_0.8","SAR_1_0.9"]
-        EXPERIMENT_ATTR = "label_mechanism"
-        EXPERIMENT_VALUES_2= [0.1,0.2,0.3,0.4,0.5]
-        EXPERIMENT_ATTR_2 = "c"
-        double_experiment()
+        CONFIG.c  = 0.1
+        EXPERIMENT_VALUES= [0.1,0.2,0.3,0.4,0.5]
+        EXPERIMENT_ATTR = "positive_ratio"
+        experiment()
     except:
-        print("Error occurred during SAR and label distribution experiment")
-
+        print("Error occurred during label distribution experiment")
 
     # reset_config()
     # # set_global_vars()
     # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
-    # print("\n -- label distribution and c -- \n")
+    # reset_config()
+    # reset_config()
+    # # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+
+    # print("\n -- SAR and LABEL DISTRIBUTION -- \n")
     # try:
-    #     EXPERIMENT_VALUES= [0.1,0.2,0.3,0.4,0.5]
-    #     EXPERIMENT_ATTR = "positive_ratio"
-    #     EXPERIMENT_VALUES_2=label_frequencies
+    #     EXPERIMENT_VALUES=["SAR_1_0.0","SAR_1_0.2","SAR_1_0.4","SAR_1_0.6","SAR_1_0.8","SAR_1_0.9"]
+    #     EXPERIMENT_ATTR = "label_mechanism"
+    #     EXPERIMENT_VALUES_2= [0.1,0.2,0.3,0.4,0.5]
     #     EXPERIMENT_ATTR_2 = "c"
     #     double_experiment()
     # except:
-    #     print("Error occurred during c and label distribution experiment")
-    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    #     print("Error occurred during SAR and label distribution experiment")
 
+    # postive ratio#
+
+
+    reset_config()
+    set_global_vars()
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+
+    print("\n -- label distribution and c -- \n")
+    try:
+        EXPERIMENT_VALUES= [0.05,0.1,0.2,0.3,0.4,0.5]
+        EXPERIMENT_ATTR = "positive_ratio"
+        EXPERIMENT_VALUES_2= [0.05,0.1,0.2,0.3,0.4,0.5]
+        EXPERIMENT_ATTR_2 = "c"
+        double_experiment()
+    except:
+        print("Error occurred during c and label distribution experiment")
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+
+    reset_config()
+    set_global_vars()
+
+    # # LABEL NOISE #
+    reset_config()
+    set_global_vars()
+
+    print("\n -- LABEL NOISE -- \n")
+    try:
+        CONFIG.c = 0.15
+        EXPERIMENT_VALUES= [0.05,0.1,0.2,0.3,0.4,0.5]
+        EXPERIMENT_ATTR = "label_noise"
+        experiment()
+    except:
+        print("Error occurred during label noise experiment")
+
+    # noise vs label frequency #
+    reset_config()
+    set_global_vars()
+
+    print("\n -- NOISE VS LABEL FREQUENCY -- \n")
+    try:
+        EXPERIMENT_VALUES= [0.05,0.1,0.2,0.3,0.4,0.5]
+        EXPERIMENT_ATTR = "label_noise"
+        EXPERIMENT_VALUES_2= [0.05,0.1,0.2,0.4,0.6,0.8,1]
+        EXPERIMENT_ATTR_2 = "c"
+        double_experiment()
+    except:
+        print("Error occurred during noise vs label frequency experiment")

@@ -14,7 +14,7 @@ class Config:
             cls.label_mechanism = 'SCAR_1_100'
             cls.positive_ratio = None # number of positives / number of negatives or None to ignore
             cls.scaler = "standard" # or "minmax"
-
+            cls.label_noise = None
 
             cls.max_iterations= 500
             cls.naive_c_guess = None

@@ -3,8 +3,8 @@ import tarfile
 import pandas as pd
 from sklearn.datasets import load_breast_cancer as load_breast_cancer_sk, make_classification
 from sklearn.datasets import fetch_openml
-from data.dataset_helpers import (reorder_dataframe_with_target_at_end, set_positive_label_distribution,
-                             normalize_data_standard_scalar, normalize_data_minmax_scalar, SCAR, SAR, case_control)
+from data.dataset_helpers import (add_label_noise, reorder_dataframe_with_target_at_end, set_positive_label_distribution,
+                             normalize_data_standard_scalar, normalize_data_minmax_scalar, label_2_PU)
 
 from config import CONFIG
 import warnings
@@ -35,6 +35,7 @@ def prepare_and_split_data(data,
                             positive_ratio=None,
                             scaler=None,
                             validation_frac=None,
+                            noise=None,
                             random_state=None,
                             as_numpy=True):
     
@@ -46,6 +47,7 @@ def prepare_and_split_data(data,
     scaler = scaler if scaler is not None else CONFIG.scaler
     validation_frac = validation_frac if validation_frac is not None else CONFIG.validation_frac
     random_state = random_state if random_state is not None else CONFIG.random_state
+    noise = noise if noise is not None else CONFIG.label_noise
 
     test_size = float(test_size)
 
@@ -89,26 +91,20 @@ def prepare_and_split_data(data,
         case _:
             warnings.warn("Error: no scalar method specified")
 
-    label_mechanism = label_mechanism.split("_")
-    n_features = int(label_mechanism[1]) if len(label_mechanism) > 1 else 1
-    strength = int(label_mechanism[2]) if len(label_mechanism) > 2 else 10
-    label_mechanism = label_mechanism[0]
-    match label_mechanism:
+    #LABEL NOISE ################
+    if noise is not None and noise > 0 and noise < 1:
+        train = add_label_noise(train, noise=noise, random_state=random_state)
 
-        case "SCAR":
-            # c = p(s = 1 |y = 1) - thus, the probability that a positive label is labeled
-            # following c, a fraction of the positive labels are unlabeled here (set to 0)
-            train = SCAR(train, c,random_state=random_state)
-            test = SCAR(test, c,random_state=random_state)
-        case "SAR":
-            train = SAR(train, c,n_features=n_features,strength=strength,random_state=random_state)
-            test = SAR(test, c,n_features=n_features,strength=strength,random_state=random_state)
-        case "casecontrol":
-            drop_feature = np.random.default_rng(seed=random_state).choice(train.shape[1]-1)
-            train = case_control(train, c=c,drop_feature=drop_feature, strength=strength, random_state=random_state)
-            test = case_control(test,   c=c,drop_feature=drop_feature, strength=strength, random_state=random_state)
-        case _:
-            raise ValueError("Error: specify correct scalar method")
+    #LABEL MECHANISM ################
+    train,features = label_2_PU(train,mechanism=label_mechanism, c=c, random_state=random_state)
+
+    CONFIG.calculated_c = train['PU'].sum() / train['target'].sum()
+    CONFIG.dominant_features = features
+
+    test,features = label_2_PU(test,mechanism=label_mechanism, c=c, random_state=random_state)
+
+
+
 
     # train labels are the PU labels, test labels are the true labels
     if validation_frac is not None:
