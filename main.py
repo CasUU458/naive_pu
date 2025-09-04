@@ -17,8 +17,8 @@ import logging
 import os
 
 import sys
-sys.path.append("/Users/cas/Documents/putm")
-from putm import PUtm
+sys.path.append("putm")
+# from putm import PUtm
 import json
 import warnings
 import numpy as np

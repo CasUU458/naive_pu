@@ -24,7 +24,7 @@ def set_positive_label_distribution(label_distribution, positives, negatives, ra
 
     test_negatives_size = negatives.shape[0]
 
-    n_positives_requested = int(test_negatives_size / (1 - label_distribution) * label_distribution)
+    n_positives_requested = int(test_negatives_size / (1 - label_distribution) - test_negatives_size)
 
     if n_positives_requested <= positives.shape[0]:
         return positives.sample(n=n_positives_requested, random_state=random_state)

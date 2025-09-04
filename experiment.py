@@ -25,7 +25,7 @@ import warnings
 warnings.filterwarnings("ignore")  # suppress all warnings
 from datetime import datetime
 import sys
-sys.path.append("/Users/cas/Documents/putm")
+sys.path.append("putm")
 from putm import PUtm
 
 
@@ -47,37 +47,38 @@ global INCLUDE_ORACLE
 os.makedirs("EXPERIMENTS", exist_ok=True)
 
 def get_models():
-    clf = {
-        "classic": ClassicLogReg(),
-        "naive": NaiveLogReg(),
-        "oracle": ClassicLogReg()
-    }
-
     clf_y = LogisticRegression(max_iter=CONFIG.max_iterations,penalty=CONFIG.penalty)
     clf_e = LogisticRegression(max_iter=CONFIG.max_iterations,penalty=CONFIG.penalty)
     TM = PUtm(clf=clf_y, clf_ex=clf_e,epochs=CONFIG.max_loop_iterations,epsilon=CONFIG.epsilon)
-    clf["two_model"] = TM 
 
-    return clf
+    return {
+        "classic": ClassicLogReg(),
+        "naive": NaiveLogReg(),
+        "oracle": ClassicLogReg(),
+        "two_model": TM
+    }
 
 
 def set_global_vars():
     global DATASETS
-    DATASETS = {"mock":None,"diabetes":get_pd_dataset(name="diabetes"),"breastcancer":get_pd_dataset(name="breastcancer"),"mnist":None}
+    DATASETS = {"breastcancer":get_pd_dataset(name="breastcancer")}
+    # DATASETS = {"mock":None,"diabetes":get_pd_dataset(name="diabetes"),"breastcancer":get_pd_dataset(name="breastcancer"),"mnist":None}
 
     global MODELS
     MODELS = get_models()
 
-    global ITERS
-    ITERS = np.arange(0,10,1)
+    global ITERS # amount of times each algorithm must run on each dataset
+    ITERS = np.arange(0,5,1)
 
     global STEP_RESULT
     STEP_RESULT = set_step_result()
+
     global RESULT_COLS
     RESULT_COLS = STEP_RESULT.index.tolist()
 
     global INCLUDE_ORACLE
     INCLUDE_ORACLE = True
+
 
 def reset_config():
           # CONFIG.RANDOM_SEED = False
@@ -140,7 +141,6 @@ def experiment():
     exp_path = os.path.join(path, f"{EXPERIMENT_ATTR}")
     os.makedirs(exp_path, exist_ok=True)
     result = make_test_result_df(sets=[EXPERIMENT_VALUES,DATASETS, ITERS, MODELS], columns=[EXPERIMENT_ATTR,"dataset","iter","model"])
-    result.to_pickle(os.path.join(exp_path, "init.pkl"))
 
     result["calculated_c"] = 0.0
     result["feature"] = ""
@@ -154,24 +154,20 @@ def experiment():
             print(f"{i} {EXPERIMENT_ATTR}: {exp}, SEED: {seed}")
             
             for dataset_name,dataset in get_datasets(DATASETS).items():
-                
-
                 X_train,s_train,X_test,y_test = prepare_and_split_data(dataset)
-                Y_TRAIN = CONFIG.true_train_labels
 
-                for model_name,clf in MODELS.items():
+                for model_name, clf in MODELS.items():
 
                     # if model_name == "two_model" and dataset_name == "mnist":
                     #         continue #skip TM on mnist for now, takes too long
 
-                    if not INCLUDE_ORACLE and model_name == "oracle":
-                        continue #skip oracle model if do_oracle is False
-
                     try:
-                        if model_name == "oracle":
-                            clf.fit(X_train,Y_TRAIN) # Fit the oracle model using true labels
+                        if model_name == "oracle" and INCLUDE_ORACLE:
+                            y_train = CONFIG.true_train_labels
+                            clf.fit(X_train,y_train) # Fit the oracle model using true labels
                         else:
                             clf.fit(X_train,s_train)
+
                         y_pred = clf.predict(X_test)
                         res = evaluate_step(y_test,y_pred)
                         mask =(
@@ -182,9 +178,8 @@ def experiment():
                         )
                         result.loc[mask,res.index] = res.values
 
-                        if CONFIG.label_mechanism.lower().startswith("sar") or CONFIG.label_mechanism.lower().startswith("case"):
-                            result.loc[mask,"calculated_c"] = CONFIG.calculated_c
-                            result.loc[mask,"feature"] = f"{CONFIG.dominant_features}"
+                        result.loc[mask,"calculated_c"] = CONFIG.calculated_c
+                        result.loc[mask,"feature"] = f"{CONFIG.dominant_features}"
 
                     except Exception as e:
                         print(f"Error occurred for {model_name} on {dataset_name}: {e}")
@@ -252,8 +247,6 @@ def get_mnist(seed):
     name = f"mnist_{digits}"
     return get_pd_dataset(name=name)
 
-def get_mock():
-    return get_pd_dataset(name="mock")
 
 def get_datasets(DATASETS):
 
@@ -262,7 +255,7 @@ def get_datasets(DATASETS):
         if key == "mnist":
             datasets["mnist"] = get_mnist(CONFIG.random_state)
         elif key == "mock":
-            datasets["mock"] = get_mock()
+            datasets["mock"] = get_pd_dataset(name="mock")
         else:
             datasets[key] = item
     return datasets
@@ -270,12 +263,6 @@ def get_datasets(DATASETS):
 if __name__ == "__main__":
 
     # label_frequencies = [0.01,0.1,0.5,1.0]
-
-    
-
-
-    reset_config()
-    set_global_vars()
 
     # DATASETS = {"mnist": None}
     # # clf_y = LogisticRegression(max_iter=CONFIG.max_iterations,penalty=CONFIG.penalty)
@@ -295,27 +282,24 @@ if __name__ == "__main__":
     # except:
     #     print("Error occurred during LABEL FREQUENCY experiment")
 
+    reset_config()
+    set_global_vars()
 
-    # DATASETS = {"mnist": None,"breastcancer":get_pd_dataset("breastcancer")}
-    # clf_y = LogisticRegression()
-    # clf_e = LogisticRegression()
-    # clf = PUtm(clf=clf_y, clf_ex=clf_e,epochs=CONFIG.max_loop_iterations,epsilon=1e-5)
-    # MODELS = {"two_model": clf}
+    DATASETS = {"breastcancer":get_pd_dataset("breastcancer")}
+    label_frequencies = np.arange(0.05, 1, 0.05)
     # label_frequencies = [0.005,0.01,0.02,0.04,0.05,0.1,0.2, 0.25,0.35,0.5,0.6,0.75,0.8, 1.0]
-    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
-    # print("\n -- LABEL FREQUENCY -- \n")
-    # try:
-    #     INCLUDE_ORACLE = False
-    #     EXPERIMENT_VALUES = label_frequencies
-    #     EXPERIMENT_ATTR = "c"
-    #     experiment()
-    # except:
-    #     print("Error occurred during LABEL FREQUENCY experiment")
+    print("\n -- LABEL FREQUENCY -- \n")
+    try:
+        INCLUDE_ORACLE = True
+        EXPERIMENT_VALUES = label_frequencies
+        EXPERIMENT_ATTR = "c"
+        experiment()
+    except:
+        print("Error occurred during LABEL FREQUENCY experiment")
     
-    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
-
-
+    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
 
     # reset_config()
     # set_global_vars()
@@ -333,20 +317,19 @@ if __name__ == "__main__":
     # except:
     #     print("Error occurred during label SCAR/SAR experiment")
 
-    
-    reset_config()
+    # reset_config()
     # set_global_vars()
-    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
-
-    print("\n -- LABEL DISTRIBUTION -- \n")
-
-    try:
-        CONFIG.c  = 0.1
-        EXPERIMENT_VALUES= [0.1,0.2,0.3,0.4,0.5]
-        EXPERIMENT_ATTR = "positive_ratio"
-        experiment()
-    except:
-        print("Error occurred during label distribution experiment")
+    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    #
+    # print("\n -- LABEL DISTRIBUTION -- \n")
+    #
+    # try:
+    #     CONFIG.c  = 0.3
+    #     EXPERIMENT_VALUES= [0.1,0.2,0.3,0.4,0.5] # prior class label distribution
+    #     EXPERIMENT_ATTR = "positive_ratio" # welk attribuut je waardes representeren
+    #     experiment()
+    # except:
+    #     print("Error occurred during label distribution experiment")
 
     # reset_config()
     # # set_global_vars()
@@ -368,48 +351,45 @@ if __name__ == "__main__":
 
     # postive ratio#
 
-
-    reset_config()
-    set_global_vars()
-    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
-
-    print("\n -- label distribution and c -- \n")
-    try:
-        EXPERIMENT_VALUES= [0.05,0.1,0.2,0.3,0.4,0.5]
-        EXPERIMENT_ATTR = "positive_ratio"
-        EXPERIMENT_VALUES_2= [0.05,0.1,0.2,0.3,0.4,0.5]
-        EXPERIMENT_ATTR_2 = "c"
-        double_experiment()
-    except:
-        print("Error occurred during c and label distribution experiment")
-    print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
-
-    reset_config()
-    set_global_vars()
-
-    # # LABEL NOISE #
-    reset_config()
-    set_global_vars()
-
-    print("\n -- LABEL NOISE -- \n")
-    try:
-        CONFIG.c = 0.15
-        EXPERIMENT_VALUES= [0.05,0.1,0.2,0.3,0.4,0.5]
-        EXPERIMENT_ATTR = "label_noise"
-        experiment()
-    except:
-        print("Error occurred during label noise experiment")
-
-    # noise vs label frequency #
-    reset_config()
-    set_global_vars()
-
-    print("\n -- NOISE VS LABEL FREQUENCY -- \n")
-    try:
-        EXPERIMENT_VALUES= [0.05,0.1,0.2,0.3,0.4,0.5]
-        EXPERIMENT_ATTR = "label_noise"
-        EXPERIMENT_VALUES_2= [0.05,0.1,0.2,0.4,0.6,0.8,1]
-        EXPERIMENT_ATTR_2 = "c"
-        double_experiment()
-    except:
-        print("Error occurred during noise vs label frequency experiment")
+# comment emieeee
+    # reset_config()
+    # set_global_vars()
+    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    #
+    # print("\n -- label distribution and c -- \n")
+    # try:
+    #     EXPERIMENT_VALUES= [0.05,0.1,0.2,0.3,0.4,0.5]
+    #     EXPERIMENT_ATTR = "positive_ratio"
+    #     EXPERIMENT_VALUES_2= [0.05,0.1,0.2,0.3,0.4,0.5]
+    #     EXPERIMENT_ATTR_2 = "c"
+    #     double_experiment()
+    # except:
+    #     print("Error occurred during c and label distribution experiment")
+    # print(datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    #
+    # # # LABEL NOISE #
+    # reset_config()
+    # set_global_vars()
+    #
+    # print("\n -- LABEL NOISE -- \n")
+    # try:
+    #     CONFIG.c = 0.15
+    #     EXPERIMENT_VALUES= [0.05,0.1,0.2,0.3,0.4,0.5]
+    #     EXPERIMENT_ATTR = "label_noise"
+    #     experiment()
+    # except:
+    #     print("Error occurred during label noise experiment")
+    #
+    # # noise vs label frequency #
+    # reset_config()
+    # set_global_vars()
+    #
+    # print("\n -- NOISE VS LABEL FREQUENCY -- \n")
+    # try:
+    #     EXPERIMENT_VALUES= [0.05,0.1,0.2,0.3,0.4,0.5]
+    #     EXPERIMENT_ATTR = "label_noise"
+    #     EXPERIMENT_VALUES_2= [0.05,0.1,0.2,0.4,0.6,0.8,1]
+    #     EXPERIMENT_ATTR_2 = "c"
+    #     double_experiment()
+    # except:
+    #     print("Error occurred during noise vs label frequency experiment")

@@ -42,8 +42,7 @@ class PUtm(BaseEstimator):
             Xtemp, stemp, weights = prepare_weighted_pu_data(X,s,ex,sx)
             self.clf.fit(Xtemp,stemp,sample_weight=weights)
             yx = self.clf.predict_proba(X)[:,1]
-            
-            
+
             hat_c = np.mean(s) 
             
             yx1 = yx[np.where(s==1)]    
@@ -74,16 +73,14 @@ class PUtm(BaseEstimator):
             sx = ex*yx 
 
             #Cas implement convergence stop         
-            eps = 1e-7
-            loss = -np.mean(s * np.log(sx + eps) + (1 - s) * np.log(1 - sx + eps))
-            
-                
-
-            if (np.abs(prev_loss - loss) < self.epsilon):
-                print(f"PUtm converged at epoch {i}")
-                break
-
-            prev_loss = loss
+            # eps = 1e-7
+            # loss = -np.mean(s * np.log(sx + eps) + (1 - s) * np.log(1 - sx + eps))
+            #
+            # if (np.abs(prev_loss - loss) < self.epsilon):
+            #     print(f"PUtm converged at epoch {i}")
+            #     break
+            #
+            # prev_loss = loss
 
         #Build final model:
         Xtemp, stemp, weights = prepare_weighted_pu_data(X,s,ex,sx)

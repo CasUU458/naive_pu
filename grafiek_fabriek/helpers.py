@@ -3,18 +3,19 @@ import os
 import numpy as np
 from sklearn.datasets import make_classification,fetch_openml
 
-PATH = "/Users/cas/Documents/naive_pu"
+PATH = "../"
 
-def get_n_labels(dataset,c_values):
+def get_n_labels(og_df, dataset,c_values):
 
     df = get_pd_dataset(dataset)
     class_prior = df["target"].mean()
-    df = df.sample(frac=0.2)
 
     lib = {}
     for c in c_values:
-        value = df.loc[df["target"]>0,"target"].sample(frac=c).sum()
-        lib[c] = f"{c:.2f} | {int(value)}"
+        positive_labels_in_test = og_df.loc[og_df["c"]==c,"1 support"].iloc[0]
+        positive_labels_in_dataset = df.loc[df["target"]>0,"target"].sum()
+        positive_labels_in_train = positive_labels_in_dataset - positive_labels_in_test
+        lib[c] = f"{c:.2f} | {int(positive_labels_in_train * c)}"
     lib["title"] = f"labels: {df.shape[0]}, class prior = {np.round(class_prior,2)}"
 
     return lib

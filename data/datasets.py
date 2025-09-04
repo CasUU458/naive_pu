@@ -43,7 +43,7 @@ def prepare_and_split_data(data,
     test_size = test_size if test_size is not None else CONFIG.test_size
     c = c if c is not None else CONFIG.c
     label_mechanism = label_mechanism if label_mechanism is not None else CONFIG.label_mechanism
-    positive_ratio = positive_ratio if positive_ratio is not None else CONFIG.positive_ratio
+    positive_ratio = positive_ratio if positive_ratio is not None else CONFIG.positive_ratio # is positive class prior
     scaler = scaler if scaler is not None else CONFIG.scaler
     validation_frac = validation_frac if validation_frac is not None else CONFIG.validation_frac
     random_state = random_state if random_state is not None else CONFIG.random_state
@@ -58,28 +58,21 @@ def prepare_and_split_data(data,
 
     CONFIG.true_prior_proba = data['target'].sum() / len(data)
 
-    # ensure both labels are included in the test set by taking a fraction according to test_size of each label
-    test_positives = data[data['target'] == 1].sample(frac=test_size, random_state=random_state)
-    test_negatives = data[data['target'] == 0].sample(frac=test_size, random_state=random_state)
-
-    # assert test_negatives.shape[0] + test_positives.shape[0] == int(test_size * len(data)), f"Test set size does not match expected size {test_negatives.shape[0] + test_positives.shape[0]} vs {int(test_size * len(data))}"
+    data_positives = data[data['target'] == 1]
+    data_negatives = data[data['target'] == 0]
 
     if positive_ratio is not None:
-        test_positives = set_positive_label_distribution(positive_ratio, test_positives, test_negatives, random_state=random_state)
+        data_positives = set_positive_label_distribution(positive_ratio, data_positives, data_negatives,random_state=random_state)
+
+    test_positives = data_positives.sample(frac=test_size, random_state=random_state)
+    test_negatives = data_negatives.sample(frac=test_size, random_state=random_state)
 
     test = pd.concat([test_positives, test_negatives]).sample(frac=1, random_state=random_state)
-    train = data.drop(test.index)
+    train_data = pd.concat([data_positives, data_negatives]).sample(frac=1, random_state=random_state)
+    train = train_data.drop(test.index)
 
     train = train.reset_index(drop=True)
     test = test.reset_index(drop=True)
-
-    train_positives = train[train['target'] == 1]
-    train_negatives = train[train['target'] == 0]
-
-    if positive_ratio is not None:
-        train_positives = set_positive_label_distribution(positive_ratio, train_positives, train_negatives,random_state=random_state)
-
-    train = pd.concat([train_positives, train_negatives]).sample(frac=1, random_state=random_state)
 
     match scaler:
         case "standard":
@@ -101,10 +94,7 @@ def prepare_and_split_data(data,
     CONFIG.calculated_c = train['PU'].sum() / train['target'].sum()
     CONFIG.dominant_features = features
 
-    test,features = label_2_PU(test,mechanism=label_mechanism, c=c, random_state=random_state)
-
-
-
+    test, _ = label_2_PU(test,mechanism=label_mechanism, c=c, random_state=random_state)
 
     # train labels are the PU labels, test labels are the true labels
     if validation_frac is not None:
